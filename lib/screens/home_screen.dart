@@ -225,6 +225,16 @@ class _NoticeSection extends StatefulWidget {
 
 class _NoticeSectionState extends State<_NoticeSection> {
   int _selectedIndex = 0;
+  late final Stream<QuerySnapshot> _noticeStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _noticeStream = FirebaseFirestore.instance
+        .collection('posts')
+        .where('category', isEqualTo: 'notice')
+        .snapshots();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -239,10 +249,7 @@ class _NoticeSectionState extends State<_NoticeSection> {
         ),
         const SizedBox(height: 12),
         StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('posts')
-              .where('category', isEqualTo: 'notice')
-              .snapshots(),
+          stream: _noticeStream,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return Text('오류가 발생했습니다.', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black));
@@ -266,10 +273,6 @@ class _NoticeSectionState extends State<_NoticeSection> {
               return bTime.compareTo(aTime);
             });
             
-            if (modifiableDocs.length > 5) {
-              modifiableDocs = modifiableDocs.sublist(0, 5);
-            }
-
             if (modifiableDocs.isEmpty) {
               return Container(
                 width: double.infinity,
@@ -302,7 +305,8 @@ class _NoticeSectionState extends State<_NoticeSection> {
             } else {
               selectedTitleWithDate = '방금 전 $selectedTitle';
             }
-            return IntrinsicHeight(
+            return SizedBox(
+              height: 160, // 스크롤을 위해 고정 높이 지정 (오른쪽 3줄 표시 및 왼쪽 4개 딱 맞춤)
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch, 
                 children: [
@@ -316,67 +320,70 @@ class _NoticeSectionState extends State<_NoticeSection> {
                         border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
                       ),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            children: [
-                                ...List.generate(modifiableDocs.length, (index) {
-                                  final n = modifiableDocs[index].data() as Map<String, dynamic>;
-                                  n['id'] = modifiableDocs[index].id;
-                                  final title = n['title'] ?? '제목 없음';
-                                  String titleWithDate = title;
-                                  if (n['created_at'] != null) {
-                                    final Timestamp ts = n['created_at'];
-                                    final DateTime dt = ts.toDate();
-                                    final yy = dt.year.toString().substring(2);
-                                    final mm = dt.month.toString().padLeft(2, '0');
-                                    final dd = dt.day.toString().padLeft(2, '0');
-                                    titleWithDate = '$yy.$mm.$dd $title';
-                                  } else {
-                                    titleWithDate = '방금 전 $title';
-                                  }
-                                  
-                                  final isSelected = _selectedIndex == index;
-                                  return InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedIndex = index;
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), 
-                                    decoration: BoxDecoration(
-                                      color: isSelected 
-                                          ? (isDarkMode ? Colors.grey[800] : Colors.blue.shade50) 
-                                          : Colors.transparent,
-                                      border: Border(
-                                        bottom: BorderSide(
-                                          color: index == modifiableDocs.length - 1 ? Colors.transparent : (isDarkMode ? Colors.white12 : Colors.grey.shade200),
-                                        ),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            titleWithDate,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                                              color: isSelected 
-                                                  ? (isDarkMode ? Colors.blue[300] : Colors.blue[700]) 
-                                                  : (isDarkMode ? Colors.white : Colors.black87),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                    ...List.generate(modifiableDocs.length, (index) {
+                                      final n = modifiableDocs[index].data() as Map<String, dynamic>;
+                                      n['id'] = modifiableDocs[index].id;
+                                      final title = n['title'] ?? '제목 없음';
+                                      String titleWithDate = title;
+                                      if (n['created_at'] != null) {
+                                        final Timestamp ts = n['created_at'];
+                                        final DateTime dt = ts.toDate();
+                                        final yy = dt.year.toString().substring(2);
+                                        final mm = dt.month.toString().padLeft(2, '0');
+                                        final dd = dt.day.toString().padLeft(2, '0');
+                                        titleWithDate = '$yy.$mm.$dd $title';
+                                      } else {
+                                        titleWithDate = '방금 전 $title';
+                                      }
+                                      
+                                      final isSelected = _selectedIndex == index;
+                                      return InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedIndex = index;
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), 
+                                        decoration: BoxDecoration(
+                                          color: isSelected 
+                                              ? (isDarkMode ? Colors.grey[800] : Colors.blue.shade50) 
+                                              : Colors.transparent,
+                                          border: Border(
+                                            bottom: BorderSide(
+                                              color: index == modifiableDocs.length - 1 ? Colors.transparent : (isDarkMode ? Colors.white12 : Colors.grey.shade200),
                                             ),
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ],
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                titleWithDate,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                                                  color: isSelected 
+                                                      ? (isDarkMode ? Colors.blue[300] : Colors.blue[700]) 
+                                                      : (isDarkMode ? Colors.white : Colors.black87),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
                           ),
                           Column(
                             children: [
@@ -387,9 +394,9 @@ class _NoticeSectionState extends State<_NoticeSection> {
                                 },
                                 child: Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
                                       Text(
                                         '더보기', 
@@ -419,33 +426,34 @@ class _NoticeSectionState extends State<_NoticeSection> {
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                                selectedTitleWithDate,
-                                                style: TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: isDarkMode ? Colors.white : Colors.black,
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 12),
-                              Text(
-                                selectedContent,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: isDarkMode ? Colors.white70 : Colors.black87,
-                                  height: 1.5,
-                                ),
-                                maxLines: 5,
-                                overflow: TextOverflow.ellipsis,
+                          Expanded(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    selectedTitleWithDate,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDarkMode ? Colors.white : Colors.black,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    selectedContent,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDarkMode ? Colors.white70 : Colors.black87,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                           Column(
                             children: [
@@ -457,9 +465,9 @@ class _NoticeSectionState extends State<_NoticeSection> {
                                 },
                                 child: Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
                                       Text(
                                         '자세히보기', 
