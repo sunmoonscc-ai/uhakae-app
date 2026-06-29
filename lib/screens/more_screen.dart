@@ -135,7 +135,7 @@ class _MoreScreenState extends State<MoreScreen> {
               color: Colors.white,
               child: ListTile(
                 leading: const Icon(Icons.admin_panel_settings, color: Colors.redAccent),
-                title: const Text('관리 (주문 및 서비스 관리)', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                title: const Text('관리 (주문 및 컨시어지 관리)', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                 trailing: const Icon(Icons.chevron_right, color: Colors.redAccent),
                 onTap: () {
                   Navigator.push(

@@ -9,7 +9,26 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('설정'),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+        elevation: 0,
+        iconTheme: IconThemeData(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+        title: Row(
+          children: [
+            Image.asset(
+              Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo(r).jpg' : 'assets/images/logo.png',
+              height: 32,
+              errorBuilder: (context, error, stackTrace) => Icon(Icons.settings, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '설정',
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
       body: ValueListenableBuilder<ThemeMode>(
         valueListenable: themeNotifier,

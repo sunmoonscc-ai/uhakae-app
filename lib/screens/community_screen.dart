@@ -4,7 +4,8 @@ import 'post_write_screen.dart';
 import 'post_detail_screen.dart';
 
 class CommunityScreen extends StatelessWidget {
-  const CommunityScreen({super.key});
+  final bool showAppBar;
+  const CommunityScreen({super.key, this.showAppBar = true});
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +15,7 @@ class CommunityScreen extends StatelessWidget {
       length: 2,
       child: Scaffold(
         backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
-        appBar: AppBar(
+        appBar: showAppBar ? AppBar(
           backgroundColor: isDarkMode ? Colors.black : Colors.white,
           elevation: 0,
           title: Row(
@@ -43,6 +44,19 @@ class CommunityScreen extends StatelessWidget {
               Tab(text: '공지사항'),
               Tab(text: '자유 게시판'),
             ],
+          ),
+        ) : PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: SafeArea(
+            child: TabBar(
+              labelColor: isDarkMode ? Colors.white : Colors.black,
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: isDarkMode ? Colors.white : Colors.black,
+              tabs: const [
+                Tab(text: '공지사항'),
+                Tab(text: '자유 게시판'),
+              ],
+            ),
           ),
         ),
         body: TabBarView(

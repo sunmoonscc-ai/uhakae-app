@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ShopScreen extends StatefulWidget {
-  const ShopScreen({super.key});
+  final VoidCallback? onNavigateHome;
+  const ShopScreen({super.key, this.onNavigateHome});
 
   @override
   State<ShopScreen> createState() => _ShopScreenState();
@@ -67,12 +68,28 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          '구매 및 대여 서비스',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
+        title: Row(
+          children: [
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: widget.onNavigateHome,
+                child: Image.asset(
+                  Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo(r).jpg' : 'assets/images/logo.png',
+                  height: 32,
+                  errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '컨시어지',
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
       body: Column(

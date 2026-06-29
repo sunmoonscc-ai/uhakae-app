@@ -98,8 +98,8 @@ class _MainScreenState extends State<MainScreen> {
   
   late final List<Widget> _widgetOptions = <Widget>[
     HomeScreen(onNavigateTab: (index) => _onItemTapped(index)),
-    const ShopScreen(),
-    const InfoScreen(),
+    ShopScreen(onNavigateHome: () => _onItemTapped(0)),
+    InfoScreen(onNavigateHome: () => _onItemTapped(0)),
     const SizedBox(), // 4번째 탭
   ];
 
@@ -183,8 +183,8 @@ class _MainScreenState extends State<MainScreen> {
             label: '홈',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_bag),
-            label: '서비스',
+            icon: Icon(Icons.face_unlock_outlined),
+            label: '컨시어지',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.info_outline),

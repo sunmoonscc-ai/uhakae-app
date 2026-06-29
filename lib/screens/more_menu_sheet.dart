@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'community_screen.dart';
 import 'admin_screen.dart';
 import 'login_screen.dart';
+import 'profile_edit_screen.dart';
 
 import 'settings_screen.dart';
 
@@ -78,16 +79,22 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
             ),
           Divider(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
           ListTile(
-            leading: Icon(Icons.forum_outlined, color: isDarkMode ? Colors.white70 : Colors.black87),
-            title: Text('커뮤니티', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+            leading: Icon(Icons.person_outline, color: isDarkMode ? Colors.white70 : Colors.black87),
+            title: Text('회원정보 수정', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
             onTap: () {
               Navigator.pop(context);
-              if (widget.onNavigate != null) {
-                widget.onNavigate!(const CommunityScreen());
+              if (isLoggedIn) {
+                if (widget.onNavigate != null) {
+                  widget.onNavigate!(const ProfileEditScreen());
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileEditScreen()),
+                  );
+                }
               } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CommunityScreen()),
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('회원정보 수정은 로그인이 필요합니다.')),
                 );
               }
             },
