@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 관리자 이메일 목록 하드코딩 (앱의 설정과 일치)
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'cebufriends79@gmail.com' ||
+        request.auth.token.email == 'slptas05@gmail.com' ||
+        request.auth.token.email == 'sunmoon.scc@gmail.com' ||
+        request.auth.token.email == 'hdcc6th@gmail.com'
+      );
+    }
+    
+    function isAuthor() {
+      return request.auth != null && request.auth.uid == resource.data.author_id;
+    }
+    
+    function isValidPost() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['post_id', 'category', 'author_id', 'title', 'content', 'created_at']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
+             data.content is string && data.content.size() > 0;
+    }
+
+    match /posts/{postId} {
+      // 읽기는 누구나 가능
+      allow read: if true;
+      
+      // 생성
+      allow create: if request.auth != null && 
+                       isValidPost() && 
+                       request.resource.data.author_id == request.auth.uid &&
+                       (request.resource.data.category == 'community' || (request.resource.data.category == 'notice' && isAdmin()));
+                       
+      // 수정
+      allow update: if request.auth != null && 
+                       (isAdmin() || (isAuthor() && resource.data.category == 'community'));
+                       
+      // 삭제
+      allow delete: if request.auth != null && 
+                       (isAdmin() || (isAuthor() && resource.data.category == 'community'));
+    }
+    
+    // 그 외의 컬렉션은 기본적으로 막음 (필요 시 추가)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

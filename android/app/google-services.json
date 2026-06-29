@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "728466681157",
+    "project_id": "uhakae-app",
+    "storage_bucket": "uhakae-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:728466681157:android:db520b0f5ac614ed27e22c",
+        "android_client_info": {
+          "package_name": "com.example.study_abroad_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCPYIucFidwg2zs5_2_6-l_noZSRWQy69Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
