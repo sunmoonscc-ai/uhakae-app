@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'community_screen.dart';
+import 'post_detail_screen.dart';
 class HomeScreen extends StatelessWidget {
   final Function(int)? onNavigateTab;
   const HomeScreen({super.key, this.onNavigateTab});
@@ -75,22 +76,16 @@ class HomeScreen extends StatelessWidget {
                       onNavigateTab!(2); // 2번 인덱스가 '정보' 탭
                     }
                   },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.grey[900] : const Color(0xFFF3F4F5),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: isDarkMode ? Colors.white24 : const Color(0xFFE1E3E4)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.light_mode, color: Color(0xFF0C6780), size: 18),
-                        SizedBox(width: 4),
-                        Text('세부 날씨는 맑음, 32°C'),
-                      ],
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.light_mode, color: Color(0xFF0C6780), size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        '세부 날씨는 맑음, 32°C',
+                        style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87),
+                      ),
+                    ],
                   ),
                 ),
                 // 환율 위젯
@@ -100,22 +95,16 @@ class HomeScreen extends StatelessWidget {
                       onNavigateTab!(2); // 환율도 정보 탭으로 이동
                     }
                   },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.grey[900] : const Color(0xFFF3F4F5),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: isDarkMode ? Colors.white24 : const Color(0xFFE1E3E4)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.monetization_on, color: Color(0xFF0C6780), size: 18),
-                        SizedBox(width: 4),
-                        Text('1\$ = 61.31 PHP (BPI)'),
-                      ],
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.monetization_on, color: Color(0xFF0C6780), size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        '1\$ = 61.31 PHP (BPI)',
+                        style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -237,43 +226,9 @@ class _NoticeSection extends StatefulWidget {
 class _NoticeSectionState extends State<_NoticeSection> {
   int _selectedIndex = 0;
 
-  final List<Map<String, String>> _notices = [
-    {
-      'title': '비자 갱신 세미나 안내',
-      'content': '2024년 새로운 학생 비자 갱신 절차에 대한 세미나를 개최합니다. 학생 여러분의 많은 참여 바랍니다.',
-      'author': '유학애 관리자',
-      'date': '10월 24일',
-    },
-    {
-      'title': '시눌룩 축제 안전 가이드',
-      'content': '세부 최대 축제인 시눌룩 축제를 안전하고 즐겁게 즐기기 위한 가이드라인입니다.',
-      'author': '유학애 안전팀',
-      'date': '10월 20일',
-    },
-    {
-      'title': '기숙사 식당 메뉴 변경 안내',
-      'content': '다음 주부터 기숙사 식당의 메뉴가 일부 변경됩니다. 새로운 식단을 확인해주세요.',
-      'author': '기숙사 관리팀',
-      'date': '10월 18일',
-    },
-    {
-      'title': '신입생 오리엔테이션 일정',
-      'content': '2024년도 하반기 신입생들을 위한 오리엔테이션 일정을 안내해 드립니다.',
-      'author': '유학애 관리자',
-      'date': '10월 15일',
-    },
-    {
-      'title': '캠퍼스 내 와이파이 점검',
-      'content': '금주 주말 동안 캠퍼스 내 전체 와이파이 네트워크 점검이 있을 예정입니다.',
-      'author': 'IT 지원팀',
-      'date': '10월 10일',
-    },
-  ];
-
   @override
   Widget build(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final notice = _notices[_selectedIndex];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,191 +238,248 @@ class _NoticeSectionState extends State<_NoticeSection> {
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
         ),
         const SizedBox(height: 12),
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch, 
-            children: [
-                // 왼쪽 칸: 공지사항 목록
-              Expanded(
-                flex: 1,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey[900] : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('posts')
+              .where('category', isEqualTo: 'notice')
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Text('오류가 발생했습니다.', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black));
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator(color: isDarkMode ? Colors.white : Colors.blue));
+            }
+
+            var docs = snapshot.data?.docs ?? [];
+            
+            var modifiableDocs = List<QueryDocumentSnapshot>.from(docs);
+            modifiableDocs.sort((a, b) {
+              final aMap = a.data() as Map<String, dynamic>;
+              final bMap = b.data() as Map<String, dynamic>;
+              final aTime = aMap['created_at'] as Timestamp?;
+              final bTime = bMap['created_at'] as Timestamp?;
+              
+              if (aTime == null && bTime == null) return 0;
+              if (aTime == null) return -1;
+              if (bTime == null) return 1;
+              return bTime.compareTo(aTime);
+            });
+            
+            if (modifiableDocs.length > 5) {
+              modifiableDocs = modifiableDocs.sublist(0, 5);
+            }
+
+            if (modifiableDocs.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[900] : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                ),
+                child: Text('등록된 공지사항이 없습니다.', textAlign: TextAlign.center, style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
+              );
+            }
+
+            if (_selectedIndex >= modifiableDocs.length) {
+              _selectedIndex = 0;
+            }
+
+            final selectedDoc = modifiableDocs[_selectedIndex].data() as Map<String, dynamic>;
+            selectedDoc['id'] = modifiableDocs[_selectedIndex].id;
+            final selectedTitle = selectedDoc['title'] ?? '제목 없음';
+            final selectedContent = selectedDoc['content'] ?? '';
+            String selectedTitleWithDate = selectedTitle;
+            if (selectedDoc['created_at'] != null) {
+              final Timestamp ts = selectedDoc['created_at'];
+              final DateTime dt = ts.toDate();
+              final yy = dt.year.toString().substring(2);
+              final mm = dt.month.toString().padLeft(2, '0');
+              final dd = dt.day.toString().padLeft(2, '0');
+              selectedTitleWithDate = '$yy.$mm.$dd $selectedTitle';
+            } else {
+              selectedTitleWithDate = '방금 전 $selectedTitle';
+            }
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch, 
+                children: [
+                    // 왼쪽 칸: 공지사항 목록
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[900] : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          ...List.generate(_notices.length, (index) {
-                            final n = _notices[index];
-                            final isSelected = _selectedIndex == index;
-                            return InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _selectedIndex = index;
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // 위아래 폭을 더 얇게 줄임 (8 -> 4)
-                                decoration: BoxDecoration(
-                                  color: isSelected 
-                                      ? (isDarkMode ? Colors.grey[800] : Colors.blue.shade50) 
-                                      : Colors.transparent,
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: index == _notices.length - 1 ? Colors.transparent : (isDarkMode ? Colors.white12 : Colors.grey.shade200),
-                                    ),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        n['title']!,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          // 글씨 두께 수정 (볼드체 제거, 선택 시 색상으로 강조)
-                                          fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                                          color: isSelected 
-                                              ? (isDarkMode ? Colors.blue[300] : Colors.blue[700]) 
-                                              : (isDarkMode ? Colors.white : Colors.black87),
+                          Column(
+                            children: [
+                                ...List.generate(modifiableDocs.length, (index) {
+                                  final n = modifiableDocs[index].data() as Map<String, dynamic>;
+                                  n['id'] = modifiableDocs[index].id;
+                                  final title = n['title'] ?? '제목 없음';
+                                  String titleWithDate = title;
+                                  if (n['created_at'] != null) {
+                                    final Timestamp ts = n['created_at'];
+                                    final DateTime dt = ts.toDate();
+                                    final yy = dt.year.toString().substring(2);
+                                    final mm = dt.month.toString().padLeft(2, '0');
+                                    final dd = dt.day.toString().padLeft(2, '0');
+                                    titleWithDate = '$yy.$mm.$dd $title';
+                                  } else {
+                                    titleWithDate = '방금 전 $title';
+                                  }
+                                  
+                                  final isSelected = _selectedIndex == index;
+                                  return InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedIndex = index;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), 
+                                    decoration: BoxDecoration(
+                                      color: isSelected 
+                                          ? (isDarkMode ? Colors.grey[800] : Colors.blue.shade50) 
+                                          : Colors.transparent,
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: index == modifiableDocs.length - 1 ? Colors.transparent : (isDarkMode ? Colors.white12 : Colors.grey.shade200),
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                      Column(
-                        children: [
-                          const Divider(height: 1),
-                          InkWell(
-                            onTap: () {
-                              // 공지사항 전체 보기 화면으로 이동
-                            },
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '더보기', 
-                                    style: TextStyle(color: isDarkMode ? Colors.blue[300] : Colors.blue, fontWeight: FontWeight.bold, fontSize: 13),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            titleWithDate,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                                              color: isSelected 
+                                                  ? (isDarkMode ? Colors.blue[300] : Colors.blue[700]) 
+                                                  : (isDarkMode ? Colors.white : Colors.black87),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  Icon(Icons.chevron_right, size: 16, color: isDarkMode ? Colors.blue[300] : Colors.blue),
-                                ],
-                              ),
-                            ),
+                                );
+                              }),
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // 오른쪽 칸: 미리보기
-              Expanded(
-                flex: 1,
-                child: Container(
-                  padding: const EdgeInsets.only(top: 12, left: 16, right: 16, bottom: 0),
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey[900] : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            notice['title']!,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white : Colors.black,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
+                          Column(
                             children: [
-                              Icon(Icons.calendar_today, size: 12, color: isDarkMode ? Colors.white70 : Colors.black54),
-                              const SizedBox(width: 4),
-                              Text(
-                                notice['date']!,
-                                style: TextStyle(fontSize: 11, color: isDarkMode ? Colors.white70 : Colors.black54),
-                              ),
-                              const Spacer(),
-                              Icon(Icons.person, size: 12, color: isDarkMode ? Colors.white70 : Colors.black54),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  notice['author']!,
-                                  style: TextStyle(fontSize: 11, color: isDarkMode ? Colors.white70 : Colors.black54),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                              const Divider(height: 1),
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(context, MaterialPageRoute(builder: (context) => const CommunityScreen()));
+                                },
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '더보기', 
+                                        style: TextStyle(color: isDarkMode ? Colors.blue[300] : Colors.blue, fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      Icon(Icons.chevron_right, size: 16, color: isDarkMode ? Colors.blue[300] : Colors.blue),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          const Divider(height: 16),
-                          Text(
-                            notice['content']!,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDarkMode ? Colors.white70 : Colors.black87,
-                              height: 1.5,
-                            ),
-                            maxLines: 5,
-                            overflow: TextOverflow.ellipsis,
-                          ),
                         ],
                       ),
-                      Column(
-                        children: [
-                          const SizedBox(height: 8),
-                          const Divider(height: 1),
-                          InkWell(
-                            onTap: () {
-                              // 자세히보기 이동
-                            },
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '자세히보기', 
-                                    style: TextStyle(color: isDarkMode ? Colors.blue[300] : Colors.blue, fontWeight: FontWeight.bold, fontSize: 13),
-                                  ),
-                                  Icon(Icons.chevron_right, size: 16, color: isDarkMode ? Colors.blue[300] : Colors.blue),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  // 오른쪽 칸: 미리보기
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      padding: const EdgeInsets.only(top: 12, left: 16, right: 16, bottom: 0),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[900] : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                                selectedTitleWithDate,
+                                                style: TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isDarkMode ? Colors.white : Colors.black,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 12),
+                              Text(
+                                selectedContent,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                                  height: 1.5,
+                                ),
+                                maxLines: 5,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              const SizedBox(height: 8),
+                              const Divider(height: 1),
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(context, MaterialPageRoute(builder: (context) => PostDetailScreen(postData: selectedDoc)));
+                                },
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '자세히보기', 
+                                        style: TextStyle(color: isDarkMode ? Colors.blue[300] : Colors.blue, fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      Icon(Icons.chevron_right, size: 16, color: isDarkMode ? Colors.blue[300] : Colors.blue),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
       ],
     );

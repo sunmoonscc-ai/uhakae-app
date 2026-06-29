@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'post_write_screen.dart';
 
 class PostDetailScreen extends StatelessWidget {
   final Map<String, dynamic> postData;
@@ -8,56 +10,133 @@ class PostDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = postData['title'] ?? '제목 없음';
-    final content = postData['content'] ?? '';
-    final authorName = postData['author_name'] ?? '익명';
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final category = postData['category'] == 'notice' ? '공지사항' : '자유 게시판';
+    final postId = postData['id'] as String?;
+
+    return Scaffold(
+      backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        title: Text(category, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16)),
+        backgroundColor: isDarkMode ? Colors.black : Colors.white,
+        elevation: 1,
+        iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.black),
+        actions: [
+          if (postId != null)
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('posts').doc(postId).snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox();
+                final currentData = snapshot.data!.data() as Map<String, dynamic>;
+                currentData['id'] = postId;
+                
+                final user = FirebaseAuth.instance.currentUser;
+                final bool isAdmin = user != null && [
+                  'cebufriends79@gmail.com',
+                  'slptas05@gmail.com',
+                  'sunmoon.scc@gmail.com',
+                  'hdcc6th@gmail.com',
+                ].contains(user.email);
+                
+                final bool isAuthor = user != null && currentData['author_id'] == user.uid;
+                final bool canEditOrDelete = isAdmin || isAuthor;
+
+                if (!canEditOrDelete) return const SizedBox();
+
+                return PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: isDarkMode ? Colors.white : Colors.black),
+                  onSelected: (value) async {
+                    if (value == 'edit') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PostWriteScreen(
+                            editPostId: postId,
+                            editPostData: currentData,
+                          ),
+                        ),
+                      );
+                    } else if (value == 'delete') {
+                      // 삭제 전 확인 다이얼로그
+                      bool? confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('게시글 삭제'),
+                          content: const Text('정말로 이 게시글을 삭제하시겠습니까?'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true), 
+                              child: const Text('삭제', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true) {
+                        try {
+                          await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시글이 삭제되었습니다.')));
+                            Navigator.pop(context);
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
+                          }
+                        }
+                      }
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'edit', child: Text('수정하기')),
+                    const PopupMenuItem(value: 'delete', child: Text('삭제하기', style: TextStyle(color: Colors.red))),
+                  ],
+                );
+              }
+            ),
+        ],
+      ),
+      body: postId == null 
+        ? _buildContent(context, postData, isDarkMode) 
+        : StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance.collection('posts').doc(postId).snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snapshot.hasData || !snapshot.data!.exists) {
+                return const Center(child: Text('게시글을 찾을 수 없습니다.'));
+              }
+              final currentData = snapshot.data!.data() as Map<String, dynamic>;
+              currentData['id'] = postId;
+              return _buildContent(context, currentData, isDarkMode);
+            },
+          ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, Map<String, dynamic> data, bool isDarkMode) {
+    final title = data['title'] ?? '제목 없음';
+    final content = data['content'] ?? '';
+    final imageUrls = List<String>.from(data['image_urls'] ?? []);
+    final authorName = data['author_name'] ?? '익명';
     
     String dateStr = '';
-    if (postData['created_at'] != null) {
-      final Timestamp ts = postData['created_at'];
+    if (data['created_at'] != null) {
+      final Timestamp ts = data['created_at'];
       final DateTime dt = ts.toDate();
       dateStr = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     }
 
-    // 관리자이거나 작성자인지 여부를 상태 관리나 Auth 연동을 통해 체크하여 수정/삭제 버튼을 노출합니다.
-    // 여기서는 UI 표시 목적으로 임시 표시
-    final bool canEditOrDelete = true;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text(category, style: const TextStyle(color: Colors.white, fontSize: 16)),
-        backgroundColor: Colors.black,
-        elevation: 1,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          if (canEditOrDelete)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: Colors.white),
-              onSelected: (value) {
-                if (value == 'delete') {
-                  // 삭제 로직 (Firestore document 삭제)
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('삭제는 준비 중입니다.')),
-                  );
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: Text('수정하기')),
-                const PopupMenuItem(value: 'delete', child: Text('삭제하기', style: TextStyle(color: Colors.red))),
-              ],
-            ),
-        ],
-      ),
-      body: SingleChildScrollView(
+    return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               title,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
             ),
             const SizedBox(height: 16),
             Row(
@@ -67,11 +146,11 @@ class PostDetailScreen extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 16,
-                      backgroundColor: Colors.grey[800],
-                      child: const Icon(Icons.person, size: 20, color: Colors.grey),
+                      backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                      child: Icon(Icons.person, size: 20, color: isDarkMode ? Colors.grey : Colors.black54),
                     ),
                     const SizedBox(width: 8),
-                    Text(authorName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    Text(authorName, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
                   ],
                 ),
                 Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
@@ -83,11 +162,40 @@ class PostDetailScreen extends StatelessWidget {
             ),
             Text(
               content,
-              style: const TextStyle(fontSize: 16, height: 1.6, color: Colors.white70),
+              style: TextStyle(fontSize: 16, height: 1.6, color: isDarkMode ? Colors.white70 : Colors.black87),
             ),
+            if (imageUrls.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              ...imageUrls.map((url) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      url,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(child: CircularProgressIndicator());
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: double.infinity,
+                          height: 200,
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                          child: const Center(
+                            child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              }),
+            ],
           ],
         ),
-      ),
-    );
+      );
   }
 }

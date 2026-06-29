@@ -35,11 +35,11 @@ class CommunityScreen extends StatelessWidget {
               ),
             ],
           ),
-          bottom: const TabBar(
-            labelColor: Colors.white,
+          bottom: TabBar(
+            labelColor: isDarkMode ? Colors.white : Colors.black,
             unselectedLabelColor: Colors.grey,
-            indicatorColor: Colors.white,
-            tabs: [
+            indicatorColor: isDarkMode ? Colors.white : Colors.black,
+            tabs: const [
               Tab(text: '공지사항'),
               Tab(text: '자유 게시판'),
             ],
@@ -67,37 +67,51 @@ class CommunityScreen extends StatelessWidget {
 
   Widget _buildPostList(String category) {
     return StreamBuilder<QuerySnapshot>(
-      // Firestore에서 카테고리에 맞는 글을 시간 역순으로 가져옴
-      // 오프라인 상태일 경우 캐시에서 가져옵니다.
       stream: FirebaseFirestore.instance
           .collection('posts')
           .where('category', isEqualTo: category)
-          .orderBy('created_at', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
+        final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
         if (snapshot.hasError) {
-          return const Center(child: Text('게시글을 불러오는 중 오류가 발생했습니다.'));
+          return Center(child: Text('게시글을 불러오는 중 오류가 발생했습니다.', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
         }
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Colors.white));
+          return Center(child: CircularProgressIndicator(color: isDarkMode ? Colors.white : Colors.blue));
         }
 
-        final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty) {
+        var docs = snapshot.data?.docs ?? [];
+        
+        // 클라이언트에서 최신순 정렬 (복합 인덱스 에러 방지)
+        var modifiableDocs = List<QueryDocumentSnapshot>.from(docs);
+        modifiableDocs.sort((a, b) {
+          final aMap = a.data() as Map<String, dynamic>;
+          final bMap = b.data() as Map<String, dynamic>;
+          final aTime = aMap['created_at'] as Timestamp?;
+          final bTime = bMap['created_at'] as Timestamp?;
+          
+          if (aTime == null && bTime == null) return 0;
+          if (aTime == null) return -1; // 방금 작성한 글(null)은 최상단
+          if (bTime == null) return 1;
+          return bTime.compareTo(aTime); // 내림차순
+        });
+
+        if (modifiableDocs.isEmpty) {
           return Center(
             child: Container(
               margin: const EdgeInsets.all(24),
               padding: const EdgeInsets.all(24),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Colors.grey[900],
+                color: isDarkMode ? Colors.grey[900] : Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white24),
+                border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
               ),
               child: Text(
                 category == 'notice' ? '등록된 공지사항이 없습니다.' : '등록된 게시글이 없습니다.\n(오프라인 상태일 수 있습니다)',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey),
+                style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54),
               ),
             ),
           );
@@ -105,11 +119,14 @@ class CommunityScreen extends StatelessWidget {
 
         return ListView.builder(
           padding: const EdgeInsets.all(16.0),
-          itemCount: docs.length,
+          itemCount: modifiableDocs.length,
           itemBuilder: (context, index) {
-            final data = docs[index].data() as Map<String, dynamic>;
+            final doc = modifiableDocs[index];
+            final data = doc.data() as Map<String, dynamic>;
+            data['id'] = doc.id;
             final title = data['title'] ?? '제목 없음';
             final content = data['content'] ?? '';
+            final imageUrls = List<String>.from(data['image_urls'] ?? []);
             final authorName = data['author_name'] ?? '익명';
             
             // 날짜 포맷팅 (임시 로직)
@@ -122,10 +139,10 @@ class CommunityScreen extends StatelessWidget {
 
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
-              color: Colors.grey[900],
+              color: isDarkMode ? Colors.grey[900] : Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                side: const BorderSide(color: Colors.white24),
+                side: BorderSide(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: InkWell(
@@ -145,17 +162,27 @@ class CommunityScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: Text(
-                              title,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    title,
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (imageUrls.isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(Icons.image, size: 16, color: isDarkMode ? Colors.white54 : Colors.black54),
+                                ],
+                              ],
                             ),
                           ),
                           if (category == 'notice')
-                            const Chip(
-                              label: Text('공지', style: TextStyle(color: Colors.black, fontSize: 10)),
-                              backgroundColor: Colors.white,
+                            Chip(
+                              label: Text('공지', style: TextStyle(color: isDarkMode ? Colors.black : Colors.white, fontSize: 10)),
+                              backgroundColor: isDarkMode ? Colors.white : Colors.black,
                               padding: EdgeInsets.zero,
                               visualDensity: VisualDensity.compact,
                             ),
@@ -164,7 +191,7 @@ class CommunityScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         content,
-                        style: const TextStyle(fontSize: 14, color: Colors.white70),
+                        style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -176,14 +203,14 @@ class CommunityScreen extends StatelessWidget {
                             children: [
                               CircleAvatar(
                                 radius: 10,
-                                backgroundColor: Colors.grey[800],
-                                child: const Icon(Icons.person, size: 12, color: Colors.grey),
+                                backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                child: Icon(Icons.person, size: 12, color: isDarkMode ? Colors.grey : Colors.black54),
                               ),
                               const SizedBox(width: 6),
-                              Text(authorName, style: const TextStyle(fontSize: 12, color: Colors.white54)),
+                              Text(authorName, style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white54 : Colors.black54)),
                             ],
                           ),
-                          Text(timeAgo, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          Text(timeAgo, style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54, fontSize: 12)),
                         ],
                       ),
                     ],

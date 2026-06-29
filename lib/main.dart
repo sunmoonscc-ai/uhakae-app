@@ -89,11 +89,18 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   Widget? _customScreen;
   
-  List<Widget> get _widgetOptions => <Widget>[
+  final List<GlobalKey<NavigatorState>> _navigatorKeys = [
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+  ];
+  
+  late final List<Widget> _widgetOptions = <Widget>[
     HomeScreen(onNavigateTab: (index) => _onItemTapped(index)),
     const ShopScreen(),
     const InfoScreen(),
-    const SizedBox(), // 4번째 탭은 화면 이동 대신 바텀시트 호출용
+    const SizedBox(), // 4번째 탭
   ];
 
   void _onItemTapped(int index) {
@@ -122,6 +129,12 @@ class _MainScreenState extends State<MainScreen> {
       );
       return;
     }
+    if (_selectedIndex == index && _selectedIndex != 3) {
+      // 이미 선택된 탭을 다시 누르면 최상단(루트) 화면으로 이동
+      _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+      return;
+    }
+
     setState(() {
       _customScreen = null;
       _selectedIndex = index;
@@ -133,8 +146,35 @@ class _MainScreenState extends State<MainScreen> {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: Center(
-        child: _customScreen ?? _widgetOptions.elementAt(_selectedIndex),
+      body: PopScope(
+        canPop: false,
+        onPopInvoked: (didPop) async {
+          if (didPop) return;
+          final isFirstRouteInCurrentTab = !await _navigatorKeys[_selectedIndex].currentState!.maybePop();
+          if (isFirstRouteInCurrentTab) {
+            if (_selectedIndex != 0) {
+              _onItemTapped(0);
+            }
+          }
+        },
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: List.generate(4, (index) {
+            return Navigator(
+              key: _navigatorKeys[index],
+              onGenerateRoute: (settings) {
+                return MaterialPageRoute(
+                  builder: (context) {
+                    if (index == 3) {
+                      return _customScreen ?? const SizedBox();
+                    }
+                    return _widgetOptions[index];
+                  },
+                );
+              },
+            );
+          }),
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
