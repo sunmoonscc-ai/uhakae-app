@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart'; // To access themeNotifier
+import '../services/preferences_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -40,8 +41,10 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   value: isDarkMode,
                   activeColor: Colors.tealAccent,
-                  onChanged: (bool value) {
+                  onChanged: (bool value) async {
                     themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
+                    // 디바이스 로컬 스토리지에 변경된 설정값 저장
+                    await PreferencesService.setDarkMode(value);
                   },
                   secondary: Icon(
                     isDarkMode ? Icons.dark_mode : Icons.light_mode,

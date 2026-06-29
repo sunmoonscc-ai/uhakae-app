@@ -66,12 +66,9 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
         children: [
           if (isLoggedIn)
             ListTile(
-              leading: Icon(Icons.person, color: isDarkMode ? Colors.white : Colors.black),
-              title: Text(userEmail, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 13)),
-              trailing: IconButton(
-                icon: const Icon(Icons.logout, color: Colors.grey, size: 20),
-                onPressed: _logout,
-              ),
+              leading: Icon(Icons.logout, color: isDarkMode ? Colors.white : Colors.black),
+              title: Text('로그아웃', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 13)),
+              onTap: _logout,
             )
           else
             ListTile(

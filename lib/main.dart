@@ -6,6 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/more_menu_sheet.dart';
 import 'screens/shop_screen.dart';
 import 'screens/info_screen.dart';
+import 'services/preferences_service.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 
@@ -21,6 +22,11 @@ void main() async {
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
   );
+
+  // 로컬 설정(SharedPreferences) 초기화
+  await PreferencesService.init();
+  // 저장된 다크모드 설정 불러오기
+  themeNotifier.value = PreferencesService.isDarkMode ? ThemeMode.dark : ThemeMode.light;
 
   runApp(const StudyAbroadApp());
 }
@@ -83,11 +89,11 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   Widget? _customScreen;
   
-  static const List<Widget> _widgetOptions = <Widget>[
-    HomeScreen(),
-    ShopScreen(),
-    InfoScreen(),
-    SizedBox(), // 4번째 탭은 화면 이동 대신 바텀시트 호출용
+  List<Widget> get _widgetOptions => <Widget>[
+    HomeScreen(onNavigateTab: (index) => _onItemTapped(index)),
+    const ShopScreen(),
+    const InfoScreen(),
+    const SizedBox(), // 4번째 탭은 화면 이동 대신 바텀시트 호출용
   ];
 
   void _onItemTapped(int index) {
