@@ -1,6 +1,9 @@
 import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
+import '../services/firebase_storage_service.dart';
 import 'school_admin_detail_screen.dart';
 import 'post_detail_screen.dart';
 
@@ -14,14 +17,19 @@ class AdminScreen extends StatefulWidget {
 class _AdminScreenState extends State<AdminScreen> {
   String _selectedTab = '사용자 관리';
   String _postAdminRegion = '전체';
+  String _postAdminSubTab = '공지사항'; // 게시물 관리 하위 탭
   String _userAdminRegion = '전체'; // 사용자 관리 탭의 선택된 지역
   String _userAdminSchool = '어학원 선택'; // 사용자 관리 탭의 선택된 어학원
   String _userAdminSubTab = '전체 회원'; // '신청자', '전체 회원', '연수종료'
-  String _schoolAdminRegionTab = '바기오'; // 어학원 관리 탭의 선택된 지역
+  String _schoolAdminRegionTab = '전체'; // 어학원 관리 탭의 선택된 지역
   
   // 정렬 관련 상태
-  String _userSortField = '정렬 방식';
+  String _userSortField = 'name';
   bool _userSortDescending = false;
+  String _schoolAdminSortField = '어학원명';
+  bool _schoolAdminSortDescending = false;
+  String _personalNoticeSortField = 'name';
+  bool _personalNoticeSortDescending = false;
 
   final List<String> _tabs = ['게시물 관리', '사용자 관리', '어학원 관리', '정보 관리', '컨시어지 관리'];
   final List<String> _regions = ['전체', '바기오', '클락', '세부', '보홀'];
@@ -30,7 +38,7 @@ class _AdminScreenState extends State<AdminScreen> {
     '바기오_BECI', '바기오_CIJ', '바기오_PINES',
     '보홀_Mint',
     '세부_B\'Cebu', '세부_BK Academy', '세부_Blue Ocean', '세부_E FRIENDS',
-    '세부_JIE', '세부_JJES', '세부_JOYFUL EDUCATION', '세부_JUNGLE', '세부_PIZZA',
+    '세부_JJES', '세부_JOYFUL EDUCATION', '세부_JUNGLE', '세부_PIZZA',
     '세부_QQ', '세부_SEL Academy', '세부_SMEAG capital', '세부_SMEAG encanto', '세부_Winning English',
     '클락_E&G',
   ];
@@ -81,7 +89,7 @@ class _AdminScreenState extends State<AdminScreen> {
       '바기오_BECI', '바기오_CIJ', '바기오_PINES',
       '보홀_Mint',
       '세부_B\'Cebu', '세부_BK Academy', '세부_Blue Ocean', '세부_E FRIENDS',
-      '세부_JIE', '세부_JJES', '세부_JOYFUL EDUCATION', '세부_JUNGLE', '세부_PIZZA',
+      '세부_JJES', '세부_JOYFUL EDUCATION', '세부_JUNGLE', '세부_PIZZA',
       '세부_QQ', '세부_SEL Academy', '세부_SMEAG capital', '세부_SMEAG encanto', '세부_Winning English',
       '클락_E&G',
     ];
@@ -229,11 +237,37 @@ class _AdminScreenState extends State<AdminScreen> {
 
       final locationCtrl = TextEditingController(text: data['location'] ?? '');
       final repNameCtrl = TextEditingController(text: data['rep_name'] ?? '');
-      final contactCtrl = TextEditingController(text: data['contact'] ?? '');
-      final repEmailCtrl = TextEditingController(text: data['rep_email'] ?? '');
-      final bankAccountCtrl = TextEditingController(text: data['bank_account'] ?? '');
+      
+      // 연락처(대표, 기타)
+      final contactMainCtrl = TextEditingController(text: data['contact_main'] ?? '');
+      final contactSubCtrl = TextEditingController(text: data['contact_sub'] ?? '');
+      
+      // 이메일(대표, 기타)
+      final emailMainCtrl = TextEditingController(text: data['email_main'] ?? '');
+      final emailSubCtrl = TextEditingController(text: data['email_sub'] ?? '');
+      
+      // 입금계좌(은행이름, 계좌번호, 명의)
+      String? selectedBank = data['bank_name'];
+      if (selectedBank != null && selectedBank.isEmpty) selectedBank = null;
+      final bankAccountNumCtrl = TextEditingController(text: data['bank_account_num'] ?? '');
+      final bankAccountOwnerCtrl = TextEditingController(text: data['bank_account_owner'] ?? '');
+      
       final descriptionCtrl = TextEditingController(text: data['description'] ?? '');
       final featuresCtrl = TextEditingController(text: data['features'] ?? '');
+      
+      List<String> bankList = [
+        '--- 한국 은행 ---',
+        '경남은행', '광주은행', '국민은행', '기업은행', '농협은행', '대구은행', 
+        '부산은행', '새마을금고', '수협은행', '신한은행', '신협', '우리은행', 
+        '우체국', '전북은행', '제주은행', '카카오뱅크', '케이뱅크', '토스뱅크', 
+        '하나은행', '한국투자증권', 'SC제일은행',
+        '--- 필리핀 은행 ---',
+        'BDO', 'BPI', 'Metrobank', 'PNB', 'RCBC', 'Security Bank', 'UnionBank'
+      ];
+      
+      if (selectedBank != null && !bankList.contains(selectedBank)) {
+        bankList.add(selectedBank);
+      }
 
       final formKey = GlobalKey<FormState>();
 
@@ -268,19 +302,69 @@ class _AdminScreenState extends State<AdminScreen> {
                               decoration: const InputDecoration(labelText: '대표자 이름'),
                             ),
                             const SizedBox(height: 12),
-                            TextFormField(
-                              controller: contactCtrl,
-                              decoration: const InputDecoration(labelText: '대표자 연락처'),
+                            // 대표자 연락처 (2개)
+                            Row(
+                              children: [
+                                Expanded(child: TextFormField(
+                                  controller: contactMainCtrl,
+                                  decoration: const InputDecoration(labelText: '연락처 (대표)'),
+                                )),
+                                const SizedBox(width: 8),
+                                Expanded(child: TextFormField(
+                                  controller: contactSubCtrl,
+                                  decoration: const InputDecoration(labelText: '연락처 (기타)'),
+                                )),
+                              ],
                             ),
                             const SizedBox(height: 12),
-                            TextFormField(
-                              controller: repEmailCtrl,
-                              decoration: const InputDecoration(labelText: '대표자 이메일'),
+                            // 대표자 이메일 (2개)
+                            Row(
+                              children: [
+                                Expanded(child: TextFormField(
+                                  controller: emailMainCtrl,
+                                  decoration: const InputDecoration(labelText: '이메일 (대표)'),
+                                )),
+                                const SizedBox(width: 8),
+                                Expanded(child: TextFormField(
+                                  controller: emailSubCtrl,
+                                  decoration: const InputDecoration(labelText: '이메일 (기타)'),
+                                )),
+                              ],
                             ),
                             const SizedBox(height: 12),
-                            TextFormField(
-                              controller: bankAccountCtrl,
-                              decoration: const InputDecoration(labelText: '입금계좌'),
+                            // 입금계좌 (은행이름 드롭다운, 계좌번호, 명의)
+                            DropdownButtonFormField<String>(
+                              value: selectedBank,
+                              decoration: const InputDecoration(labelText: '은행이름'),
+                              dropdownColor: isDarkMode ? Colors.grey[800] : Colors.white,
+                              items: bankList.map((String bank) {
+                                bool isSeparator = bank.startsWith('---');
+                                return DropdownMenuItem<String>(
+                                  value: isSeparator ? null : bank,
+                                  enabled: !isSeparator,
+                                  child: Text(bank, style: TextStyle(
+                                    color: isSeparator ? Colors.grey : (isDarkMode ? Colors.white : Colors.black),
+                                    fontWeight: isSeparator ? FontWeight.bold : FontWeight.normal,
+                                  )),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => selectedBank = val);
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(flex: 3, child: TextFormField(
+                                  controller: bankAccountNumCtrl,
+                                  decoration: const InputDecoration(labelText: '계좌번호'),
+                                )),
+                                const SizedBox(width: 8),
+                                Expanded(flex: 2, child: TextFormField(
+                                  controller: bankAccountOwnerCtrl,
+                                  decoration: const InputDecoration(labelText: '명의'),
+                                )),
+                              ],
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
@@ -312,9 +396,13 @@ class _AdminScreenState extends State<AdminScreen> {
                             await FirebaseFirestore.instance.collection('schools').doc(schoolName).set({
                               'location': locationCtrl.text,
                               'rep_name': repNameCtrl.text,
-                              'contact': contactCtrl.text,
-                              'rep_email': repEmailCtrl.text,
-                              'bank_account': bankAccountCtrl.text,
+                              'contact_main': contactMainCtrl.text,
+                              'contact_sub': contactSubCtrl.text,
+                              'email_main': emailMainCtrl.text,
+                              'email_sub': emailSubCtrl.text,
+                              'bank_name': selectedBank ?? '',
+                              'bank_account_num': bankAccountNumCtrl.text,
+                              'bank_account_owner': bankAccountOwnerCtrl.text,
                               'description': descriptionCtrl.text,
                               'features': featuresCtrl.text,
                               'updated_at': FieldValue.serverTimestamp(),
@@ -468,48 +556,26 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
             ),
           ),
-          // 하단 2단 레이아웃 (공지사항 / 자유게시판)
-          Expanded(
+          // 하위 탭 (공지사항, 개별공지, 자유게시판)
+          Container(
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
+            ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 좌측: 공지사항
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        right: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          width: double.infinity,
-                          color: isDarkMode ? Colors.grey[900] : Colors.grey[200],
-                          child: Text('공지사항', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
-                        ),
-                        Expanded(child: _buildPostList('notice', isDarkMode)),
-                      ],
-                    ),
-                  ),
-                ),
-                // 우측: 자유게시판
-                Expanded(
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        width: double.infinity,
-                        color: isDarkMode ? Colors.grey[900] : Colors.grey[200],
-                        child: Text('자유게시판', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
-                      ),
-                      Expanded(child: _buildPostList('community', isDarkMode)),
-                    ],
-                  ),
-                ),
+                _buildPostAdminSubTabItem('공지사항', isDarkMode),
+                _buildPostAdminSubTabItem('개별공지', isDarkMode),
+                _buildPostAdminSubTabItem('자유게시판', isDarkMode),
               ],
             ),
+          ),
+          // 탭 내용
+          Expanded(
+            child: _postAdminSubTab == '공지사항'
+                ? _buildPostList('notice', isDarkMode)
+                : _postAdminSubTab == '개별공지'
+                    ? _buildPersonalNoticeTab(isDarkMode)
+                    : _buildPostList('community', isDarkMode),
           ),
         ],
       );
@@ -599,47 +665,6 @@ class _AdminScreenState extends State<AdminScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                
-                // 정렬 기준 드롭다운
-                Expanded(
-                  flex: 2,
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: _userSortField,
-                      dropdownColor: isDarkMode ? Colors.grey[800] : Colors.white,
-                      style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 14),
-                      items: const [
-                        DropdownMenuItem(value: '정렬 방식', child: Text('정렬 방식')),
-                        DropdownMenuItem(value: 'name', child: Text('이름 순')),
-                        DropdownMenuItem(value: 'phone_kr', child: Text('한국 번호 순')),
-                        DropdownMenuItem(value: 'school', child: Text('어학원 순')),
-                        DropdownMenuItem(value: 'start_date', child: Text('시작일자 순')),
-                      ],
-                      onChanged: (String? newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _userSortField = newValue;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                ),
-                
-                // 오름/내림차순 토글
-                IconButton(
-                  icon: Icon(
-                    _userSortDescending ? Icons.arrow_downward : Icons.arrow_upward,
-                    color: isDarkMode ? Colors.white70 : Colors.black54,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _userSortDescending = !_userSortDescending;
-                    });
-                  },
-                ),
               ],
             ),
           ),
@@ -653,103 +678,205 @@ class _AdminScreenState extends State<AdminScreen> {
     }
 
     if (_selectedTab == '어학원 관리') {
-      final List<String> regions = ['바기오', '클락', '세부', '보홀'];
+      final List<String> regions = ['전체', '바기오', '클락', '세부', '보홀'];
       
-      // 어학원 리스트 가나다 순 정렬 및 선택된 지역 필터링
       final sortedSchools = _schoolList
-          .where((school) => school.startsWith('${_schoolAdminRegionTab}_'))
-          .toList()..sort();
+          .where((school) => _schoolAdminRegionTab == '전체' || school.startsWith('${_schoolAdminRegionTab}_'))
+          .toList();
       
-      return Column(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
-            ),
-            child: Row(
-              children: regions.map((region) {
-                final isSelected = _schoolAdminRegionTab == region;
-                return Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      setState(() {
-                        _schoolAdminRegionTab = region;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(
-                            color: isSelected ? Colors.blue : Colors.transparent,
-                            width: 3,
+      return StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('schools').snapshots(),
+        builder: (context, snapshot) {
+          final docs = snapshot.data?.docs ?? [];
+          final schoolDataMap = { for (var doc in docs) doc.id: doc.data() as Map<String, dynamic> };
+
+          return Column(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
+                ),
+                child: Row(
+                  children: regions.map((region) {
+                    final isSelected = _schoolAdminRegionTab == region;
+                    return Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            _schoolAdminRegionTab = region;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: isSelected ? Colors.blue : Colors.transparent,
+                                width: 3,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        region,
-                        style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          Expanded(
-            child: sortedSchools.isEmpty 
-                ? Center(
-                    child: Text('해당 지역에 등록된 어학원이 없습니다.', style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54)),
-                  )
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 3.5,
-                    ),
-                    itemCount: sortedSchools.length,
-                    itemBuilder: (context, index) {
-                      final schoolName = sortedSchools[index];
-                      return Card(
-                        color: isDarkMode ? Colors.grey[850] : Colors.white,
-                        elevation: 1,
-                        margin: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          side: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: InkWell(
-                          onTap: () => _showEditSchoolDialog(context, schoolName, isDarkMode),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.school, color: Colors.blue, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    schoolName,
-                                    style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 13),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
+                          alignment: Alignment.center,
+                          child: Text(
+                            region,
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
                             ),
                           ),
                         ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[850] : Colors.grey[100],
+                  border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 4, 
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            if (_schoolAdminSortField == '어학원명') {
+                              _schoolAdminSortDescending = !_schoolAdminSortDescending;
+                            } else {
+                              _schoolAdminSortField = '어학원명';
+                              _schoolAdminSortDescending = false;
+                            }
+                          });
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('어학원명', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87)),
+                            if (_schoolAdminSortField == '어학원명')
+                              Icon(_schoolAdminSortDescending ? Icons.arrow_downward : Icons.arrow_upward, size: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3, 
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            if (_schoolAdminSortField == '대표자 이름') {
+                              _schoolAdminSortDescending = !_schoolAdminSortDescending;
+                            } else {
+                              _schoolAdminSortField = '대표자 이름';
+                              _schoolAdminSortDescending = false;
+                            }
+                          });
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('대표자 이름', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87)),
+                            if (_schoolAdminSortField == '대표자 이름')
+                              Icon(_schoolAdminSortDescending ? Icons.arrow_downward : Icons.arrow_upward, size: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(flex: 5, child: Text('메모', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87))),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: sortedSchools.isEmpty 
+                    ? Center(
+                        child: Text('해당 지역에 등록된 어학원이 없습니다.', style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54)),
+                      )
+                    : Builder(
+                        builder: (context) {
+                          sortedSchools.sort((aId, bId) {
+                            final aData = schoolDataMap[aId] ?? {};
+                            final bData = schoolDataMap[bId] ?? {};
+                            
+                            int result = 0;
+                            if (_schoolAdminSortField == '어학원명') {
+                              String aName = aId.replaceFirst(RegExp(r'^[^_]+_'), '');
+                              String bName = bId.replaceFirst(RegExp(r'^[^_]+_'), '');
+                              result = aName.compareTo(bName);
+                            } else if (_schoolAdminSortField == '대표자 이름') {
+                              String aRep = (aData['rep_name'] ?? '').toString();
+                              String bRep = (bData['rep_name'] ?? '').toString();
+                              result = aRep.compareTo(bRep);
+                            }
+                            
+                            return _schoolAdminSortDescending ? -result : result;
+                          });
+
+                          return ListView.builder(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                            itemCount: sortedSchools.length,
+                        itemBuilder: (context, index) {
+                          final schoolId = sortedSchools[index];
+                          final displaySchoolName = schoolId.replaceFirst('${_schoolAdminRegionTab}_', '');
+                          final schoolData = schoolDataMap[schoolId] ?? {};
+                          final repName = schoolData['rep_name'] ?? '-';
+                          final memo = schoolData['features'] ?? '-';
+
+                          return InkWell(
+                            onTap: () => _showEditSchoolDialog(context, schoolId, isDarkMode),
+                            child: Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              color: isDarkMode ? Colors.grey[850] : Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                side: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 4,
+                                      child: Text(
+                                        displaySchoolName,
+                                        style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 13),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Text(
+                                        repName.toString().isEmpty ? '-' : repName,
+                                        style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87, fontSize: 12),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 5,
+                                      child: Text(
+                                        memo.toString().isEmpty ? '-' : memo,
+                                        style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87, fontSize: 12),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       );
-                    },
+                    }
                   ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       );
     }
 
@@ -904,7 +1031,7 @@ class _AdminScreenState extends State<AdminScreen> {
           final aMap = a.data() as Map<String, dynamic>;
           final bMap = b.data() as Map<String, dynamic>;
 
-          String sortKey = _userSortField == '정렬 방식' ? 'name' : _userSortField;
+          String sortKey = _userSortField;
           String aVal = (aMap[sortKey] ?? '').toString().toLowerCase();
           String bVal = (bMap[sortKey] ?? '').toString().toLowerCase();
           return _userSortDescending ? bVal.compareTo(aVal) : aVal.compareTo(bVal);
@@ -998,6 +1125,33 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
+  Widget _buildUserSortHeader(String title, String field, int flex, bool isDarkMode) {
+    bool isSelected = _userSortField == field;
+    return Expanded(
+      flex: flex,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            if (isSelected) {
+              _userSortDescending = !_userSortDescending;
+            } else {
+              _userSortField = field;
+              _userSortDescending = false;
+            }
+          });
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87)),
+            if (isSelected)
+              Icon(_userSortDescending ? Icons.arrow_downward : Icons.arrow_upward, size: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDashboardColumn(String title, List<QueryDocumentSnapshot> docs, bool isDarkMode, {bool showApprove = false, bool isTop = false}) {
     return Container(
       decoration: BoxDecoration(
@@ -1027,10 +1181,10 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
             child: Row(
               children: [
-                Expanded(flex: 4, child: Text('이름', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87))),
-                Expanded(flex: 5, child: Text('전화', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87))),
-                Expanded(flex: 6, child: Text('어학원', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87))),
-                Expanded(flex: 4, child: Text('연수시작일', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87))),
+                _buildUserSortHeader('이름', 'name', 4, isDarkMode),
+                _buildUserSortHeader('전화', 'phone_kr', 5, isDarkMode),
+                _buildUserSortHeader('어학원', 'school', 6, isDarkMode),
+                _buildUserSortHeader('연수시작일', 'start_date', 4, isDarkMode),
                 const SizedBox(width: 45), // 처리 버튼 공간
               ],
             ),
@@ -1053,7 +1207,10 @@ class _AdminScreenState extends State<AdminScreen> {
                       final name = data['name'] ?? '이름 없음';
                       final phoneKr = data['phone_kr'] ?? '';
                       final phonePh = data['phone_ph'] ?? '';
-                      final school = data['school'] ?? '소속 미정';
+                      String displaySchool = data['school'] ?? '소속 미정';
+                      if (_userAdminRegion != '전체' && displaySchool.startsWith('${_userAdminRegion}_')) {
+                        displaySchool = displaySchool.replaceFirst('${_userAdminRegion}_', '');
+                      }
                       final startDate = data['start_date'] ?? '미정';
 
                       return InkWell(
@@ -1106,7 +1263,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                 Expanded(
                                   flex: 6,
                                   child: Text(
-                                    school,
+                                    displaySchool,
                                     style: TextStyle(color: isDarkMode ? Colors.blue[200] : Colors.blue[700], fontSize: 13),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -1287,6 +1444,600 @@ class _AdminScreenState extends State<AdminScreen> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildPostAdminSubTabItem(String title, bool isDarkMode) {
+    final isSelected = _postAdminSubTab == title;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _postAdminSubTab = title;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isSelected ? Colors.blue : Colors.transparent,
+                width: 3,
+              ),
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            title,
+            style: TextStyle(
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonalNoticeTab(bool isDarkMode) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('오류가 발생했습니다.', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
+        }
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        var docs = snapshot.data?.docs ?? [];
+        
+        final List<String> adminEmails = [
+          'cebufriends79@gmail.com',
+          'slptas05@gmail.com',
+          'sunmoon.scc@gmail.com',
+          'hdcc6th@gmail.com',
+        ];
+
+        // 어드민 필터 및 지역 필터
+        docs = docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final email = data['email'] as String? ?? '';
+          if (adminEmails.contains(email)) return false;
+          
+          final school = data['school'] as String? ?? '';
+          if (_postAdminRegion != '전체') {
+            if (!school.startsWith('${_postAdminRegion}_')) return false;
+          }
+          return true;
+        }).toList();
+
+        final activeDocs = <QueryDocumentSnapshot>[];
+        final endedDocs = <QueryDocumentSnapshot>[];
+
+        for (var doc in docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final level = data['level'] as String? ?? '정회원';
+          if (level == '연수종료') {
+            endedDocs.add(doc);
+          } else if (level != '예비') { // 정회원
+            activeDocs.add(doc);
+          }
+        }
+
+        // 정렬
+        void sortDocs(List<QueryDocumentSnapshot> list) {
+          list.sort((a, b) {
+            final aMap = a.data() as Map<String, dynamic>;
+            final bMap = b.data() as Map<String, dynamic>;
+            String aVal = (aMap[_personalNoticeSortField] ?? '').toString().toLowerCase();
+            String bVal = (bMap[_personalNoticeSortField] ?? '').toString().toLowerCase();
+            return _personalNoticeSortDescending ? bVal.compareTo(aVal) : aVal.compareTo(bVal);
+          });
+        }
+        
+        sortDocs(activeDocs);
+        sortDocs(endedDocs);
+
+        return Column(
+          children: [
+            _buildPersonalNoticeHeader(isDarkMode),
+            Expanded(
+              child: _buildPersonalNoticeList(activeDocs, isDarkMode, '정회원 목록'),
+            ),
+            if (endedDocs.isNotEmpty) ...[
+              Container(height: 1, color: isDarkMode ? Colors.white12 : Colors.grey.shade300),
+              Container(
+                color: isDarkMode ? Colors.grey[900] : Colors.grey[200],
+                padding: const EdgeInsets.all(8),
+                alignment: Alignment.centerLeft,
+                child: Text('연수종료 회원 목록', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+              ),
+              SizedBox(
+                height: 180, // 약 3줄 정도가 보이도록 고정 높이 지정
+                child: _buildPersonalNoticeList(endedDocs, isDarkMode, '연수종료 회원 목록', hideHeader: true),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildPersonalNoticeHeader(bool isDarkMode) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey[850] : Colors.grey[100],
+        border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
+      ),
+      child: Row(
+        children: [
+          _buildPersonalNoticeSortHeader('이름', 'name', 3, isDarkMode),
+          _buildPersonalNoticeSortHeader('어학원', 'school', 5, isDarkMode),
+          _buildPersonalNoticeSortHeader('연수시작일', 'start_date', 4, isDarkMode),
+          _buildPersonalNoticeSortHeader('연수종료일', 'end_date', 4, isDarkMode),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonalNoticeSortHeader(String title, String field, int flex, bool isDarkMode) {
+    bool isSelected = _personalNoticeSortField == field;
+    return Expanded(
+      flex: flex,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            if (isSelected) {
+              _personalNoticeSortDescending = !_personalNoticeSortDescending;
+            } else {
+              _personalNoticeSortField = field;
+              _personalNoticeSortDescending = false;
+            }
+          });
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87)),
+            if (isSelected)
+              Icon(_personalNoticeSortDescending ? Icons.arrow_downward : Icons.arrow_upward, size: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonalNoticeList(List<QueryDocumentSnapshot> docs, bool isDarkMode, String title, {bool hideHeader = false}) {
+    if (docs.isEmpty) {
+      return Center(
+        child: Text('해당하는 회원이 없습니다.', style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54)),
+      );
+    }
+    
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      itemCount: docs.length,
+      itemBuilder: (context, index) {
+        final doc = docs[index];
+        final data = doc.data() as Map<String, dynamic>;
+        
+        final name = data['name'] ?? '이름 없음';
+        
+        String displaySchool = data['school'] ?? '소속 미정';
+        if (_postAdminRegion != '전체' && displaySchool.startsWith('${_postAdminRegion}_')) {
+          displaySchool = displaySchool.replaceFirst('${_postAdminRegion}_', '');
+        }
+        
+        final startDate = data['start_date'] ?? '미정';
+        final endDate = data['end_date'] ?? '미정';
+
+        return InkWell(
+          onTap: () => _showPersonalNoticeUserDialog(context, doc.id, name, isDarkMode),
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            color: isDarkMode ? Colors.grey[850] : Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              side: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                  Expanded(
+                    flex: 5,
+                    child: Text(displaySchool, style: TextStyle(color: isDarkMode ? Colors.blue[200] : Colors.blue[700], fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                  Expanded(
+                    flex: 4,
+                    child: Text(startDate, style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                  Expanded(
+                    flex: 4,
+                    child: Text(endDate, style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showPersonalNoticeUserDialog(BuildContext context, String userId, String userName, bool isDarkMode) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('$userName 님의 개별공지 목록', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+                    IconButton(icon: Icon(Icons.close, color: isDarkMode ? Colors.white54 : Colors.black54), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('personal_notices')
+                        .where('userId', isEqualTo: userId)
+                        .snapshots(),
+                    builder: (ctx, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(child: Text('데이터를 불러오는 중 오류가 발생했습니다: ${snapshot.error}', style: TextStyle(color: Colors.red, fontSize: 12)));
+                      }
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return Center(child: Text('등록된 개별공지가 없습니다.', style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54)));
+                      }
+
+                      final notices = snapshot.data!.docs.toList();
+                      // Dart 메모리에서 정렬 (복합 인덱스 오류 방지 및 형변환 오류 방지)
+                      notices.sort((a, b) {
+                        try {
+                          final aData = a.data() as Map<String, dynamic>;
+                          final bData = b.data() as Map<String, dynamic>;
+                          final aDate = aData['createdAt'] is Timestamp ? aData['createdAt'] as Timestamp : null;
+                          final bDate = bData['createdAt'] is Timestamp ? bData['createdAt'] as Timestamp : null;
+                          
+                          if (aDate == null && bDate == null) return 0;
+                          if (aDate == null) return 1;
+                          if (bDate == null) return -1;
+                          return bDate.compareTo(aDate);
+                        } catch (e) {
+                          return 0;
+                        }
+                      });
+
+                      return ListView.builder(
+                        itemCount: notices.length,
+                        itemBuilder: (ctx, index) {
+                          final notice = notices[index];
+                          final data = notice.data() as Map<String, dynamic>;
+                          final title = data['title'] ?? '제목 없음';
+                          final content = data['content'] ?? '';
+                          final isRead = data['isRead'] as bool? ?? false;
+                          final createdAt = data['createdAt'] as Timestamp?;
+                          final dateStr = createdAt != null 
+                              ? '${createdAt.toDate().year}-${createdAt.toDate().month.toString().padLeft(2, '0')}-${createdAt.toDate().day.toString().padLeft(2, '0')} ${createdAt.toDate().hour.toString().padLeft(2, '0')}:${createdAt.toDate().minute.toString().padLeft(2, '0')}' 
+                              : '날짜 없음';
+                          final imageUrls = data['image_urls'] as List<dynamic>? ?? [];
+                          
+                          final readAt = data['readAt'] as Timestamp?;
+                          String readText = isRead ? '읽음' : '안읽음';
+                          if (isRead && readAt != null) {
+                            readText = '읽음\n${readAt.toDate().year.toString().substring(2)}-${readAt.toDate().month.toString().padLeft(2, '0')}-${readAt.toDate().day.toString().padLeft(2, '0')} ${readAt.toDate().hour.toString().padLeft(2, '0')}:${readAt.toDate().minute.toString().padLeft(2, '0')}';
+                          }
+
+                          return Card(
+                            color: isDarkMode ? Colors.grey[850] : Colors.grey[50],
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              title: Row(
+                                children: [
+                                  Expanded(child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black))),
+                                  if (imageUrls.isNotEmpty)
+                                    Icon(Icons.image, size: 16, color: Colors.blue[400]),
+                                ],
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(dateStr, style: TextStyle(fontSize: 12, color: Colors.blue[400])),
+                                  const SizedBox(height: 4),
+                                  Text(content, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87)),
+                                ],
+                              ),
+                              trailing: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isRead ? Colors.grey.withOpacity(0.2) : Colors.red.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  readText,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isRead ? Colors.grey : Colors.red,
+                                  ),
+                                ),
+                              ),
+                              isThreeLine: true,
+                              onTap: () {
+                                _showPersonalNoticeEditDialog(context, notice.id, userId, title, content, isDarkMode, initialImageUrls: imageUrls.cast<String>());
+                              },
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () {
+                      _showPersonalNoticeEditDialog(context, null, userId, '', '', isDarkMode, initialImageUrls: []);
+                    },
+                    child: const Text('신규 개별공지 작성', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    );
+  }
+
+  void _showPersonalNoticeEditDialog(BuildContext context, String? docId, String userId, String initialTitle, String initialContent, bool isDarkMode, {List<String>? initialImageUrls}) {
+    final titleCtrl = TextEditingController(text: initialTitle);
+    final contentCtrl = TextEditingController(text: initialContent);
+    bool isLoading = false;
+    final ImagePicker picker = ImagePicker();
+    List<XFile> selectedImages = [];
+    List<String> existingImageUrls = initialImageUrls != null ? List<String>.from(initialImageUrls) : [];
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (stContext, setSt) {
+            return AlertDialog(
+              backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+              title: Text(docId == null ? '신규 개별공지' : '개별공지 수정', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+              content: SingleChildScrollView(
+                child: SizedBox(
+                  width: 400,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: titleCtrl,
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                        decoration: InputDecoration(
+                          labelText: '제목',
+                          labelStyle: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: contentCtrl,
+                        maxLines: 5,
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                        decoration: InputDecoration(
+                          labelText: '내용',
+                          alignLabelWithHint: true,
+                          labelStyle: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54),
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                        onPressed: () async {
+                          if (selectedImages.length + existingImageUrls.length >= 5) {
+                            UiUtils.showPopup(context, '사진은 최대 5개까지만 첨부할 수 있습니다.');
+                            return;
+                          }
+                          final List<XFile> images = await picker.pickMultiImage();
+                          if (images.isNotEmpty) {
+                            setSt(() {
+                              int remaining = 5 - (selectedImages.length + existingImageUrls.length);
+                              if (images.length > remaining) {
+                                selectedImages.addAll(images.take(remaining));
+                                UiUtils.showPopup(context, '사진은 최대 5개까지만 첨부할 수 있어 초과된 사진은 제외되었습니다.');
+                              } else {
+                                selectedImages.addAll(images);
+                              }
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.photo_library),
+                        label: const Text('사진 첨부 (최대 5장)'),
+                      ),
+                      if (existingImageUrls.isNotEmpty || selectedImages.isNotEmpty)
+                        Container(
+                          height: 100,
+                          margin: const EdgeInsets.only(top: 8),
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              ...existingImageUrls.asMap().entries.map((entry) {
+                                int idx = entry.key;
+                                String url = entry.value;
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.only(right: 8, top: 8),
+                                      width: 80, height: 80,
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey.shade300),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(url, fit: BoxFit.cover),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 0, top: 0,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setSt(() => existingImageUrls.removeAt(idx));
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                          child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
+                              ...selectedImages.asMap().entries.map((entry) {
+                                int idx = entry.key;
+                                XFile file = entry.value;
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.only(right: 8, top: 8),
+                                      width: 80, height: 80,
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey.shade300),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: FutureBuilder<Uint8List>(
+                                          future: file.readAsBytes(),
+                                          builder: (context, snapshot) {
+                                            if (snapshot.hasData) return Image.memory(snapshot.data!, fit: BoxFit.cover);
+                                            return const Center(child: CircularProgressIndicator());
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 0, top: 0,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setSt(() => selectedImages.removeAt(idx));
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                          child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                if (docId != null)
+                  TextButton(
+                    onPressed: isLoading ? null : () async {
+                      setSt(() => isLoading = true);
+                      await FirebaseFirestore.instance.collection('personal_notices').doc(docId).delete();
+                      if (context.mounted) {
+                        Navigator.pop(ctx);
+                        UiUtils.showPopup(context, '삭제되었습니다.');
+                      }
+                    },
+                    child: const Text('삭제', style: TextStyle(color: Colors.red)),
+                  ),
+                TextButton(
+                  onPressed: isLoading ? null : () => Navigator.pop(ctx),
+                  child: const Text('취소', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading ? null : () async {
+                    if (titleCtrl.text.trim().isEmpty || contentCtrl.text.trim().isEmpty) {
+                      UiUtils.showPopup(context, '제목과 내용을 입력해주세요.');
+                      return;
+                    }
+                    
+                    setSt(() => isLoading = true);
+                    
+                    List<String> newUrls = [];
+                    if (selectedImages.isNotEmpty) {
+                      for (var file in selectedImages) {
+                        final url = await FirebaseStorageService.uploadImage(file);
+                        if (url != null) {
+                          newUrls.add(url);
+                        }
+                      }
+                    }
+                    
+                    final List<String> finalImageUrls = [...existingImageUrls, ...newUrls];
+                    
+                    final data = {
+                      'userId': userId,
+                      'title': titleCtrl.text.trim(),
+                      'content': contentCtrl.text.trim(),
+                      'image_urls': finalImageUrls,
+                      if (docId == null) 'createdAt': FieldValue.serverTimestamp(),
+                      if (docId == null) 'isRead': false,
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    };
+                    
+                    if (docId == null) {
+                      await FirebaseFirestore.instance.collection('personal_notices').add(data);
+                    } else {
+                      await FirebaseFirestore.instance.collection('personal_notices').doc(docId).update(data);
+                    }
+                    
+                    if (context.mounted) {
+                      Navigator.pop(ctx);
+                      UiUtils.showPopup(context, '저장되었습니다.');
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                  child: isLoading 
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('저장', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          }
+        );
+      }
     );
   }
 }

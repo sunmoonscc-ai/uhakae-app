@@ -118,12 +118,15 @@ class _MainScreenState extends State<MainScreen> {
               .get();
           
           if (result.docs.isNotEmpty) {
-            final level = result.docs.first.data()['level'] as String? ?? '정회원';
+            final userDoc = result.docs.first;
+            final level = userDoc.data()['level'] as String? ?? '정회원';
             if (level != '정회원') {
               await FirebaseAuth.instance.signOut();
               await GoogleSignIn(
                 clientId: '728466681157-hqbrfqmv0fu4s5jibin426sn027ah32v.apps.googleusercontent.com',
               ).signOut();
+            } else {
+              _checkPersonalNotices(userDoc.id);
             }
           } else {
             await FirebaseAuth.instance.signOut();
@@ -131,9 +134,118 @@ class _MainScreenState extends State<MainScreen> {
               clientId: '728466681157-hqbrfqmv0fu4s5jibin426sn027ah32v.apps.googleusercontent.com',
             ).signOut();
           }
+        } else {
+          // 어드민일 경우에도 개별공지 체크가 필요한지? 보통 어드민은 개별공지 받는 주체가 아니지만,
+          // DB에 본인 이메일로 생성된 문서가 있다면 체크.
+          final result = await FirebaseFirestore.instance
+              .collection('users')
+              .where('email', isEqualTo: user.email)
+              .limit(1)
+              .get();
+          if (result.docs.isNotEmpty) {
+            _checkPersonalNotices(result.docs.first.id);
+          }
         }
       }
     });
+  }
+
+  void _checkPersonalNotices(String userId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('personal_notices')
+        .where('userId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      if (!mounted) return;
+      final notices = snapshot.docs;
+      
+      showDialog(
+        context: context,
+        builder: (ctx) {
+          final bool isDarkMode = Theme.of(ctx).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+            title: Text('새로운 알림이 도착했습니다', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: notices.length,
+                itemBuilder: (context, index) {
+                  final data = notices[index].data();
+                  final title = data['title'] ?? '제목 없음';
+                  final content = data['content'] ?? '';
+                  final createdAt = data['createdAt'] as Timestamp?;
+                  final dateStr = createdAt != null 
+                      ? '${createdAt.toDate().year}-${createdAt.toDate().month.toString().padLeft(2, '0')}-${createdAt.toDate().day.toString().padLeft(2, '0')}' 
+                      : '';
+                  final imageUrls = data['image_urls'] as List<dynamic>? ?? [];
+                  
+                  return Card(
+                    color: isDarkMode ? Colors.grey[850] : Colors.grey[50],
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDarkMode ? Colors.white : Colors.black)),
+                          const SizedBox(height: 4),
+                          Text(dateStr, style: TextStyle(fontSize: 12, color: Colors.blue[400])),
+                          const SizedBox(height: 8),
+                          if (imageUrls.isNotEmpty)
+                            Container(
+                              height: 120,
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: imageUrls.length,
+                                itemBuilder: (ctx, imgIdx) {
+                                  return Container(
+                                    margin: const EdgeInsets.only(right: 8),
+                                    width: 120,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.grey.shade300),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(imageUrls[imgIdx], fit: BoxFit.cover),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          Text(content, style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () async {
+                  // 알림 읽음 처리
+                  for (var doc in notices) {
+                    await FirebaseFirestore.instance.collection('personal_notices').doc(doc.id).update({
+                      'isRead': true,
+                      'readAt': FieldValue.serverTimestamp(),
+                    });
+                  }
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                child: const Text('확인', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      );
+    }
   }
 
   @override
