@@ -13,7 +13,7 @@ class CommunityScreen extends StatelessWidget {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
         appBar: showAppBar ? AppBar(
@@ -43,6 +43,7 @@ class CommunityScreen extends StatelessWidget {
             indicatorColor: isDarkMode ? Colors.white : Colors.black,
             tabs: const [
               Tab(text: '공지사항'),
+              Tab(text: '개별공지'),
               Tab(text: '자유 게시판'),
             ],
           ),
@@ -55,6 +56,7 @@ class CommunityScreen extends StatelessWidget {
               indicatorColor: isDarkMode ? Colors.white : Colors.black,
               tabs: const [
                 Tab(text: '공지사항'),
+                Tab(text: '개별공지'),
                 Tab(text: '자유 게시판'),
               ],
             ),
@@ -63,6 +65,7 @@ class CommunityScreen extends StatelessWidget {
         body: TabBarView(
           children: [
             _buildPostList('notice'),
+            _buildPostList('individual_notice'),
             _buildPostList('community'),
           ],
         ),
@@ -153,6 +156,8 @@ class CommunityScreen extends StatelessWidget {
             final content = data['content'] ?? '';
             final imageUrls = List<String>.from(data['image_urls'] ?? []);
             final authorName = data['author_name'] ?? '익명';
+            final bool isAdminPost = data['is_admin'] == true;
+            final displayAuthorName = isAdminPost ? '관리자' : authorName;
             
             // 날짜 포맷팅 (임시 로직)
             String timeAgo = '조금 전';
@@ -184,8 +189,10 @@ class CommunityScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
+                          Text(timeAgo, style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54, fontSize: 12)),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Row(
                               children: [
@@ -198,45 +205,42 @@ class CommunityScreen extends StatelessWidget {
                                   ),
                                 ),
                                 if (imageUrls.isNotEmpty) ...[
-                                  const SizedBox(width: 6),
-                                  Icon(Icons.image, size: 16, color: isDarkMode ? Colors.white54 : Colors.black54),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.image, size: 14, color: isDarkMode ? Colors.white54 : Colors.black54),
                                 ],
                               ],
                             ),
                           ),
-                          if (category == 'notice')
+                          const SizedBox(width: 8),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 8,
+                                backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                child: Icon(Icons.person, size: 10, color: isDarkMode ? Colors.grey : Colors.black54),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(displayAuthorName, style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white54 : Colors.black54)),
+                            ],
+                          ),
+                          if (category == 'notice' || category == 'individual_notice') ...[
+                            const SizedBox(width: 8),
                             Chip(
                               label: Text('공지', style: TextStyle(color: isDarkMode ? Colors.black : Colors.white, fontSize: 10)),
                               backgroundColor: isDarkMode ? Colors.white : Colors.black,
                               padding: EdgeInsets.zero,
                               visualDensity: VisualDensity.compact,
                             ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
                         content,
                         style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
-                        maxLines: 2,
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 10,
-                                backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                                child: Icon(Icons.person, size: 12, color: isDarkMode ? Colors.grey : Colors.black54),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(authorName, style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white54 : Colors.black54)),
-                            ],
-                          ),
-                          Text(timeAgo, style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54, fontSize: 12)),
-                        ],
                       ),
                     ],
                   ),

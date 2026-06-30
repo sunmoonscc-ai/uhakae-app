@@ -137,6 +137,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
       // 새 글 작성
       postData['author_id'] = user.uid;
       postData['author_name'] = user.displayName ?? '익명';
+      postData['is_admin'] = isAdmin;
       postData['created_at'] = FieldValue.serverTimestamp();
       postData['post_id'] = ''; // 임시
 
@@ -172,7 +173,31 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: Text('글쓰기', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [
+            Image.asset(
+              isDarkMode ? 'assets/images/logo(r).jpg' : 'assets/images/logo.png',
+              height: 28,
+              errorBuilder: (context, error, stackTrace) => Icon(Icons.forum, color: isDarkMode ? Colors.white : Colors.black),
+            ),
+            const SizedBox(width: 8),
+            Text('글쓰기', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(width: 12),
+            InkWell(
+              onTap: () => Navigator.pop(context),
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: isDarkMode ? Colors.white54 : Colors.black26),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text('목록보기', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 12)),
+              ),
+            ),
+          ],
+        ),
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
         elevation: 1,
         iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.black),
@@ -200,6 +225,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                     style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                     items: const [
                       DropdownMenuItem(value: 'notice', child: Text('공지사항')),
+                      DropdownMenuItem(value: 'individual_notice', child: Text('개별공지')),
                       DropdownMenuItem(value: 'community', child: Text('자유 게시판')),
                     ],
                     onChanged: (val) {

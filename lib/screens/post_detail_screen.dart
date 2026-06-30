@@ -18,7 +18,31 @@ class PostDetailScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: Text(category, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16)),
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [
+            Image.asset(
+              isDarkMode ? 'assets/images/logo(r).jpg' : 'assets/images/logo.png',
+              height: 28,
+              errorBuilder: (context, error, stackTrace) => Icon(Icons.forum, color: isDarkMode ? Colors.white : Colors.black),
+            ),
+            const SizedBox(width: 8),
+            Text(category, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 12),
+            InkWell(
+              onTap: () => Navigator.pop(context),
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: isDarkMode ? Colors.white54 : Colors.black26),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text('목록보기', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 12)),
+              ),
+            ),
+          ],
+        ),
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
         elevation: 1,
         iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.black),
