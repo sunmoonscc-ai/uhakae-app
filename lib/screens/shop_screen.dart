@@ -1,3 +1,4 @@
+import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -49,9 +50,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                 'created_at': FieldValue.serverTimestamp(),
               });
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("'$itemName' 요청이 성공적으로 큐에 저장되었습니다!")),
-              );
+              UiUtils.showPopup(context, "'$itemName' 요청이 성공적으로 큐에 저장되었습니다!");
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
             child: const Text('접수하기', style: TextStyle(color: Colors.white)),

@@ -1,3 +1,4 @@
+import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'community_screen.dart';
 import 'admin_screen.dart';
@@ -120,7 +121,7 @@ class _MoreScreenState extends State<MoreScreen> {
                   title: const Text('설정'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('설정 화면은 준비 중입니다.')));
+                    UiUtils.showPopup(context, '설정 화면은 준비 중입니다.');
                   },
                 ),
               ],

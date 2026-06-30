@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'dart:async';
 import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 import 'screens/more_menu_sheet.dart';
@@ -88,6 +91,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   Widget? _customScreen;
+  StreamSubscription<User?>? _authSubscription;
   
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
     GlobalKey<NavigatorState>(),
@@ -96,6 +100,48 @@ class _MainScreenState extends State<MainScreen> {
     GlobalKey<NavigatorState>(),
   ];
   
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) async {
+      if (user == null && mounted) {
+        setState(() {
+          _customScreen = null;
+          _selectedIndex = 0;
+        });
+      } else if (user != null && mounted) {
+        if (!PreferencesService.isAdmin) {
+          final result = await FirebaseFirestore.instance
+              .collection('users')
+              .where('email', isEqualTo: user.email)
+              .limit(1)
+              .get();
+          
+          if (result.docs.isNotEmpty) {
+            final level = result.docs.first.data()['level'] as String? ?? '정회원';
+            if (level != '정회원') {
+              await FirebaseAuth.instance.signOut();
+              await GoogleSignIn(
+                clientId: '728466681157-hqbrfqmv0fu4s5jibin426sn027ah32v.apps.googleusercontent.com',
+              ).signOut();
+            }
+          } else {
+            await FirebaseAuth.instance.signOut();
+            await GoogleSignIn(
+              clientId: '728466681157-hqbrfqmv0fu4s5jibin426sn027ah32v.apps.googleusercontent.com',
+            ).signOut();
+          }
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
   late final List<Widget> _widgetOptions = <Widget>[
     HomeScreen(onNavigateTab: (index) => _onItemTapped(index)),
     ShopScreen(onNavigateHome: () => _onItemTapped(0)),

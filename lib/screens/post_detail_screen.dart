@@ -1,3 +1,4 @@
+import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -77,12 +78,12 @@ class PostDetailScreen extends StatelessWidget {
                         try {
                           await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시글이 삭제되었습니다.')));
+                            UiUtils.showPopup(context, '게시글이 삭제되었습니다.');
                             Navigator.pop(context);
                           }
                         } catch (e) {
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
+                            UiUtils.showPopup(context, '삭제 실패: $e');
                           }
                         }
                       }

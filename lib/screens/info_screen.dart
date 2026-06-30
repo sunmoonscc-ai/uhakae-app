@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'community_screen.dart';
 import 'weather_screen.dart';
 import 'exchange_screen.dart';
+import 'news_screen.dart';
+import 'contact_screen.dart';
+import '../services/preferences_service.dart';
 
 // 메인 카테고리 (가나다 순)
-final ValueNotifier<String> infoMainCategoryNotifier = ValueNotifier<String>('Cebu 정보');
+final ValueNotifier<String> infoMainCategoryNotifier = ValueNotifier<String>('지역');
 final List<String> infoMainCategories = [
-  'Cebu 정보',
+  '지역',
   '날씨',
   '뉴스',
   '주요연락처',
@@ -14,9 +17,13 @@ final List<String> infoMainCategories = [
   '환율',
 ];
 
-// Cebu 정보 하위 카테고리 (가나다 순)
-final ValueNotifier<String> cebuSubCategoryNotifier = ValueNotifier<String>('레저');
-final List<Map<String, dynamic>> cebuSubCategories = [
+// 공통 지역 카테고리 (2단)
+final ValueNotifier<String> commonRegionNotifier = ValueNotifier<String>('전체');
+final List<String> commonRegions = ['전체', '바기오', '클락', '세부', '보홀'];
+
+// 지역 하위 카테고리 (3단)
+final ValueNotifier<String> regionSubCategoryNotifier = ValueNotifier<String>('레저');
+final List<Map<String, dynamic>> regionSubCategories = [
   {'label': '레저', 'icon': Icons.directions_run, 'color': const Color(0xFFE6F3FF)},
   {'label': '마사지', 'icon': Icons.spa, 'color': const Color(0xFFF3E5F5)},
   {'label': '병원', 'icon': Icons.local_hospital, 'color': const Color(0xFFFFEBEE)},
@@ -29,6 +36,10 @@ final List<Map<String, dynamic>> cebuSubCategories = [
   {'label': '카페·바', 'icon': Icons.local_cafe, 'color': const Color(0xFFEFEBE9)},
   {'label': '환전', 'icon': Icons.currency_exchange, 'color': const Color(0xFFF1F8E9)},
 ];
+
+// 뉴스 3차 카테고리 (유형)
+final ValueNotifier<String> newsTypeNotifier = ValueNotifier<String>('News');
+final List<String> newsTypes = ['News', '업체 Event'];
 
 class InfoScreen extends StatefulWidget {
   final VoidCallback? onNavigateHome;
@@ -44,11 +55,16 @@ class _InfoScreenState extends State<InfoScreen> {
   @override
   void initState() {
     super.initState();
-    for (var cat in cebuSubCategories) {
+    if (PreferencesService.isAdmin) {
+      commonRegionNotifier.value = PreferencesService.defaultRegion;
+    } else {
+      commonRegionNotifier.value = PreferencesService.userRegion;
+    }
+    for (var cat in regionSubCategories) {
       _subCatKeys[cat['label']] = GlobalKey();
     }
     
-    cebuSubCategoryNotifier.addListener(_scrollToSelectedSubCategory);
+    regionSubCategoryNotifier.addListener(_scrollToSelectedSubCategory);
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToSelectedSubCategory();
@@ -57,12 +73,12 @@ class _InfoScreenState extends State<InfoScreen> {
 
   @override
   void dispose() {
-    cebuSubCategoryNotifier.removeListener(_scrollToSelectedSubCategory);
+    regionSubCategoryNotifier.removeListener(_scrollToSelectedSubCategory);
     super.dispose();
   }
 
   void _scrollToSelectedSubCategory() {
-    final key = _subCatKeys[cebuSubCategoryNotifier.value];
+    final key = _subCatKeys[regionSubCategoryNotifier.value];
     if (key != null && key.currentContext != null) {
       Scrollable.ensureVisible(
         key.currentContext!,
@@ -154,24 +170,64 @@ class _InfoScreenState extends State<InfoScreen> {
                 ),
               ),
 
-              // 2차 서브 탭 (Cebu 정보 선택 시에만 표시)
-              if (mainCategory == 'Cebu 정보')
+              // 2차 서브 탭 (지역, 뉴스, 주요연락처, 커뮤니티 선택 시에 표시) - 관리자에게만 표시
+              if (PreferencesService.isAdmin && ['지역', '뉴스', '주요연락처', '커뮤니티'].contains(mainCategory))
                 Container(
                   color: isDarkMode ? Colors.black : const Color(0xFFF1F3F5),
                   height: 48,
                   child: ValueListenableBuilder<String>(
-                    valueListenable: cebuSubCategoryNotifier,
+                    valueListenable: commonRegionNotifier,
+                    builder: (context, region, _) {
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: commonRegions.map((reg) {
+                            final isSelected = region == reg;
+                            return Container(
+                              child: InkWell(
+                                onTap: () {
+                                  commonRegionNotifier.value = reg;
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    reg,
+                                    style: TextStyle(
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      color: isSelected
+                                          ? (isDarkMode ? Colors.blue[200] : Colors.blue[700])
+                                          : (isDarkMode ? Colors.white54 : Colors.black54),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+              // 3차 서브 탭 (지역 선택 시에만 표시)
+              if (mainCategory == '지역')
+                Container(
+                  color: isDarkMode ? Colors.grey[900] : const Color(0xFFE9ECEF),
+                  height: 48,
+                  child: ValueListenableBuilder<String>(
+                    valueListenable: regionSubCategoryNotifier,
                     builder: (context, subCategory, _) {
                       return SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: cebuSubCategories.map((subCat) {
+                          children: regionSubCategories.map((subCat) {
                             final isSelected = subCategory == subCat['label'];
                             return Container(
                               key: _subCatKeys[subCat['label']],
                               child: InkWell(
                                 onTap: () {
-                                  cebuSubCategoryNotifier.value = subCat['label'];
+                                  regionSubCategoryNotifier.value = subCat['label'];
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -195,6 +251,47 @@ class _InfoScreenState extends State<InfoScreen> {
                   ),
                 ),
 
+              // 3차 서브 탭 (뉴스 선택 시에만 표시 - 유형)
+              if (mainCategory == '뉴스')
+                Container(
+                  color: isDarkMode ? Colors.grey[900] : const Color(0xFFE9ECEF),
+                  height: 40,
+                  child: ValueListenableBuilder<String>(
+                    valueListenable: newsTypeNotifier,
+                    builder: (context, type, _) {
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: newsTypes.map((typ) {
+                            final isSelected = type == typ;
+                            return Container(
+                              child: InkWell(
+                                onTap: () {
+                                  newsTypeNotifier.value = typ;
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    typ,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      color: isSelected
+                                          ? (isDarkMode ? Colors.blue[300] : Colors.blue[800])
+                                          : (isDarkMode ? Colors.white54 : Colors.black54),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
               // 본문 내용
               Expanded(
                 child: Builder(
@@ -203,20 +300,62 @@ class _InfoScreenState extends State<InfoScreen> {
                       return const WeatherScreen();
                     } else if (mainCategory == '환율') {
                       return const ExchangeScreen();
-                    } else if (mainCategory == '커뮤니티') {
-                      return const CommunityScreen(showAppBar: false); // AppBar 숨김 처리 필요 시 대응
-                    } else if (mainCategory == 'Cebu 정보') {
+                    } else if (['지역', '뉴스', '주요연락처', '커뮤니티'].contains(mainCategory)) {
                       return ValueListenableBuilder<String>(
-                        valueListenable: cebuSubCategoryNotifier,
-                        builder: (context, subCategory, _) {
-                          return Center(
-                            child: Text(
-                              "Cebu 정보 > '$subCategory' 상세 화면 준비 중입니다.",
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                        valueListenable: commonRegionNotifier,
+                        builder: (context, currentRegion, _) {
+                          // 비관리자는 자신의 지역을 고정 사용, 관리자는 선택한 지역 사용
+                          final region = PreferencesService.isAdmin ? currentRegion : PreferencesService.userRegion;
+
+                          if (region == '전체') {
+                            return Center(
+                              child: Text(
+                                "위 탭에서 지역을 먼저 선택해 주세요.",
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Colors.black54,
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          }
+
+                          if (mainCategory == '지역') {
+                            return ValueListenableBuilder<String>(
+                              valueListenable: regionSubCategoryNotifier,
+                              builder: (context, subCategory, _) {
+                                return Center(
+                                  child: Text(
+                                    "지역 > '$region' > '$subCategory' 상세 화면 준비 중입니다.",
+                                    style: TextStyle(
+                                      color: isDarkMode ? Colors.white70 : Colors.black54,
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          } else if (mainCategory == '뉴스') {
+                            return ValueListenableBuilder<String>(
+                              valueListenable: newsTypeNotifier,
+                              builder: (context, type, _) {
+                                if (type == 'News') {
+                                  return NewsScreen(region: region);
+                                } else {
+                                  return Center(
+                                    child: Text(
+                                      "뉴스 > '$region' > '업체 Event' 상세 화면 준비 중입니다.",
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            );
+                          } else if (mainCategory == '주요연락처') {
+                            return ContactScreen(region: region);
+                          } else if (mainCategory == '커뮤니티') {
+                            return CommunityScreen(showAppBar: false, region: region);
+                          }
+                          return const SizedBox.shrink();
                         },
                       );
                     } else {

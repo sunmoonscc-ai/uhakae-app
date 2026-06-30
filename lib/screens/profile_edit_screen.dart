@@ -1,6 +1,8 @@
+import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/preferences_service.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -19,24 +21,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   
   String? _selectedSchool;
   final List<String> _schoolList = [
-    '바기오_BECI',
-    '바기오_CIJ',
-    '바기오_PINES',
+    '바기오_BECI', '바기오_CIJ', '바기오_PINES',
     '보홀_Mint',
-    '세부_B\'Cebu',
-    '세부_BK Academy',
-    '세부_Blue Ocean',
-    '세부_E FRIENDS',
-    '세부_JIE',
-    '세부_JJES',
-    '세부_JOYFUL EDUCATION',
-    '세부_JUNGLE',
-    '세부_PIZZA',
-    '세부_QQ',
-    '세부_SEL Academy',
-    '세부_SMEAG capital',
-    '세부_SMEAG encanto',
-    '세부_Winning English',
+    '세부_B\'Cebu', '세부_BK Academy', '세부_Blue Ocean', '세부_E FRIENDS',
+    '세부_JIE', '세부_JJES', '세부_JOYFUL EDUCATION', '세부_JUNGLE', '세부_PIZZA',
+    '세부_QQ', '세부_SEL Academy', '세부_SMEAG capital', '세부_SMEAG encanto', '세부_Winning English',
     '클락_E&G',
   ];
   
@@ -126,10 +115,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               .add(updateData);
         }
 
+        // 선택한 학교를 바탕으로 userRegion 갱신
+        final parts = _schoolController.text.split('_');
+        final userRegion = (parts.isNotEmpty && parts[0].isNotEmpty) ? parts[0] : '전체';
+        await PreferencesService.setUserRegion(userRegion);
+
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('회원정보가 성공적으로 수정되었습니다.')),
-          );
+          UiUtils.showPopup(context, '회원정보가 성공적으로 수정되었습니다.');
           if (Navigator.canPop(context)) {
             Navigator.pop(context);
           }
@@ -137,9 +129,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류 발생: $e')),
-        );
+        UiUtils.showPopup(context, '오류 발생: $e');
       }
     } finally {
       if (mounted) {

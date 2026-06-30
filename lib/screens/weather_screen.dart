@@ -54,11 +54,13 @@ class _WeatherScreenState extends State<WeatherScreen> {
         position.longitude,
       );
 
+      if (!mounted) return;
       setState(() {
         _weatherData = data;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;

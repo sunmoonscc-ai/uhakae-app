@@ -5,7 +5,8 @@ import 'post_detail_screen.dart';
 
 class CommunityScreen extends StatelessWidget {
   final bool showAppBar;
-  const CommunityScreen({super.key, this.showAppBar = true});
+  final String region;
+  const CommunityScreen({super.key, this.showAppBar = true, this.region = '전체'});
 
   @override
   Widget build(BuildContext context) {
@@ -96,6 +97,16 @@ class CommunityScreen extends StatelessWidget {
         }
 
         var docs = snapshot.data?.docs ?? [];
+        
+        // 지역 필터링 (클라이언트 단 처리 - 인덱스 오류 방지)
+        if (region != '전체') {
+          docs = docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            // 기존 데이터에 region 필드가 없으면 '세부'로 간주
+            final docRegion = data['region'] as String? ?? '세부';
+            return docRegion == region;
+          }).toList();
+        }
         
         // 클라이언트에서 최신순 정렬 (복합 인덱스 에러 방지)
         var modifiableDocs = List<QueryDocumentSnapshot>.from(docs);

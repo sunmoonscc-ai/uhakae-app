@@ -1,3 +1,4 @@
+import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -51,9 +52,7 @@ class _SchoolAdminDetailScreenState extends State<SchoolAdminDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('데이터를 불러오는데 실패했습니다: $e')),
-        );
+        UiUtils.showPopup(context, '데이터를 불러오는데 실패했습니다: $e');
       }
     } finally {
       if (mounted) {
@@ -84,16 +83,12 @@ class _SchoolAdminDetailScreenState extends State<SchoolAdminDetailScreen> {
       }, SetOptions(merge: true));
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('어학원 정보가 저장되었습니다.')),
-        );
+        UiUtils.showPopup(context, '어학원 정보가 저장되었습니다.');
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장에 실패했습니다: $e')),
-        );
+        UiUtils.showPopup(context, '저장에 실패했습니다: $e');
       }
     } finally {
       if (mounted) {

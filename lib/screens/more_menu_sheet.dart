@@ -1,5 +1,7 @@
+import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'community_screen.dart';
 import 'admin_screen.dart';
 import 'login_screen.dart';
@@ -34,8 +36,15 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
 
   void _logout() async {
     await FirebaseAuth.instance.signOut();
+    await GoogleSignIn(
+      clientId: '728466681157-hqbrfqmv0fu4s5jibin426sn027ah32v.apps.googleusercontent.com',
+    ).signOut();
     if (mounted) {
-      setState(() {});
+      Navigator.pop(context); // 팝업 메뉴 닫기
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
     }
   }
 
@@ -93,9 +102,7 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
                   );
                 }
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('회원정보 수정은 로그인이 필요합니다.')),
-                );
+                UiUtils.showPopup(context, '회원정보 수정은 로그인이 필요합니다.');
               }
             },
           ),

@@ -1,3 +1,4 @@
+import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -52,9 +53,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
 
   Future<void> _pickImages() async {
     if (_selectedImages.length >= 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('사진은 최대 5개까지만 첨부할 수 있습니다.')),
-      );
+      UiUtils.showPopup(context, '사진은 최대 5개까지만 첨부할 수 있습니다.');
       return;
     }
 
@@ -64,9 +63,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
         int remainingSlots = 5 - _selectedImages.length;
         if (images.length > remainingSlots) {
           _selectedImages.addAll(images.take(remainingSlots));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('사진은 최대 5개까지만 첨부할 수 있어 초과된 사진은 제외되었습니다.')),
-          );
+          UiUtils.showPopup(context, '사진은 최대 5개까지만 첨부할 수 있어 초과된 사진은 제외되었습니다.');
         } else {
           _selectedImages.addAll(images);
         }
@@ -86,16 +83,12 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그인이 필요합니다.')),
-      );
+      UiUtils.showPopup(context, '로그인이 필요합니다.');
       return;
     }
 
     if (title.isEmpty || content.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('제목과 내용을 모두 입력해주세요.')),
-      );
+      UiUtils.showPopup(context, '제목과 내용을 모두 입력해주세요.');
       return;
     }
 
@@ -135,7 +128,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
         postData['updated_at'] = FieldValue.serverTimestamp(); 
         await FirebaseFirestore.instance.collection('posts').doc(widget.editPostId).update(postData);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시글이 수정되었습니다.')));
+          UiUtils.showPopup(context, '게시글이 수정되었습니다.');
           Navigator.pop(context);
         }
         return;
@@ -153,19 +146,12 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
 
       if (mounted) {
         // 스낵바로 오프라인 지속성 안내
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('게시글이 저장되었습니다. (네트워크 오프라인 시 연결 후 자동 업로드됩니다.)'),
-            duration: Duration(seconds: 3),
-          ),
-        );
+        UiUtils.showPopup(context, '게시글이 저장되었습니다. (네트워크 오프라인 시 연결 후 자동 업로드됩니다.)');
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 실패: $e')),
-        );
+        UiUtils.showPopup(context, '저장 실패: $e');
       }
     } finally {
       if (mounted) {

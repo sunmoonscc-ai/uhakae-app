@@ -193,17 +193,17 @@ class _ShortcutSectionState extends State<_ShortcutSection> {
     {'label': '주요연락처', 'icon': Icons.contact_phone, 'color': Colors.green[50], 'mainTab': '주요연락처'},
     {'label': '커뮤니티', 'icon': Icons.forum, 'color': Colors.orange[50], 'mainTab': '커뮤니티'},
     {'label': '환율', 'icon': Icons.show_chart, 'color': Colors.purple[50], 'mainTab': '환율'},
-    {'label': '레저', 'icon': Icons.directions_run, 'color': const Color(0xFFE6F3FF), 'mainTab': 'Cebu 정보'},
-    {'label': '마사지', 'icon': Icons.spa, 'color': const Color(0xFFF3E5F5), 'mainTab': 'Cebu 정보'},
-    {'label': '병원', 'icon': Icons.local_hospital, 'color': const Color(0xFFFFEBEE), 'mainTab': 'Cebu 정보'},
-    {'label': '뷰티', 'icon': Icons.face, 'color': const Color(0xFFFCE4EC), 'mainTab': 'Cebu 정보'},
-    {'label': '세탁', 'icon': Icons.local_laundry_service, 'color': const Color(0xFFE0F7FA), 'mainTab': 'Cebu 정보'},
-    {'label': '쇼핑', 'icon': Icons.shopping_bag, 'color': const Color(0xFFFFF8E1), 'mainTab': 'Cebu 정보'},
-    {'label': '식당', 'icon': Icons.restaurant, 'color': const Color(0xFFFFF3E0), 'mainTab': 'Cebu 정보'},
-    {'label': '여행', 'icon': Icons.flight, 'color': const Color(0xFFE8EAF6), 'mainTab': 'Cebu 정보'},
-    {'label': '음식', 'icon': Icons.fastfood, 'color': const Color(0xFFFFE0B2), 'mainTab': 'Cebu 정보'},
-    {'label': '카페·바', 'icon': Icons.local_cafe, 'color': const Color(0xFFEFEBE9), 'mainTab': 'Cebu 정보'},
-    {'label': '환전', 'icon': Icons.currency_exchange, 'color': const Color(0xFFF1F8E9), 'mainTab': 'Cebu 정보'},
+    {'label': '레저', 'icon': Icons.directions_run, 'color': const Color(0xFFE6F3FF), 'mainTab': '지역'},
+    {'label': '마사지', 'icon': Icons.spa, 'color': const Color(0xFFF3E5F5), 'mainTab': '지역'},
+    {'label': '병원', 'icon': Icons.local_hospital, 'color': const Color(0xFFFFEBEE), 'mainTab': '지역'},
+    {'label': '뷰티', 'icon': Icons.face, 'color': const Color(0xFFFCE4EC), 'mainTab': '지역'},
+    {'label': '세탁', 'icon': Icons.local_laundry_service, 'color': const Color(0xFFE0F7FA), 'mainTab': '지역'},
+    {'label': '쇼핑', 'icon': Icons.shopping_bag, 'color': const Color(0xFFFFF8E1), 'mainTab': '지역'},
+    {'label': '식당', 'icon': Icons.restaurant, 'color': const Color(0xFFFFF3E0), 'mainTab': '지역'},
+    {'label': '여행', 'icon': Icons.flight, 'color': const Color(0xFFE8EAF6), 'mainTab': '지역'},
+    {'label': '음식', 'icon': Icons.fastfood, 'color': const Color(0xFFFFE0B2), 'mainTab': '지역'},
+    {'label': '카페·바', 'icon': Icons.local_cafe, 'color': const Color(0xFFEFEBE9), 'mainTab': '지역'},
+    {'label': '환전', 'icon': Icons.currency_exchange, 'color': const Color(0xFFF1F8E9), 'mainTab': '지역'},
   ];
 
   void _scrollLeft() {
@@ -263,8 +263,8 @@ class _ShortcutSectionState extends State<_ShortcutSection> {
                         borderRadius: BorderRadius.circular(12),
                         onTap: () {
                           infoMainCategoryNotifier.value = cat['mainTab'];
-                          if (cat['mainTab'] == 'Cebu 정보') {
-                            cebuSubCategoryNotifier.value = cat['label'];
+                          if (cat['mainTab'] == '지역') {
+                            regionSubCategoryNotifier.value = cat['label'];
                           }
                           
                           final homeScreen = context.findAncestorWidgetOfExactType<HomeScreen>();

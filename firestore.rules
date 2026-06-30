@@ -41,6 +41,24 @@ service cloud.firestore {
       // 삭제
       allow delete: if request.auth != null && 
                        (isAdmin() || (isAuthor() && resource.data.category == 'community'));
+    match /news/{document=**} {
+      // 뉴스는 누구나 읽을 수 있음
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /schools/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /users/{userId} {
+      // 본인 정보만 쓰기/읽기 허용, 관리자는 모두 허용
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+    
+    match /orders/{document=**} {
+      allow read, write: if request.auth != null;
     }
     
     // 그 외의 컬렉션은 기본적으로 막음 (필요 시 추가)

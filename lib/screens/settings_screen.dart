@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart'; // To access themeNotifier
 import '../services/preferences_service.dart';
+import 'info_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -71,6 +72,75 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              if (PreferencesService.isAdmin) ...[
+                const SizedBox(height: 16),
+                Card(
+                  color: isDarkMode ? Colors.grey[900] : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.location_on, color: isDarkMode ? Colors.white : Colors.black),
+                            const SizedBox(width: 16),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '기본 지역 설정',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: isDarkMode ? Colors.white : Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '정보 탭의 기본 지역을 선택합니다.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        StatefulBuilder(
+                          builder: (context, setState) {
+                            return DropdownButton<String>(
+                              value: PreferencesService.defaultRegion,
+                              dropdownColor: isDarkMode ? Colors.grey[800] : Colors.white,
+                              underline: const SizedBox(),
+                              icon: Icon(Icons.arrow_drop_down, color: isDarkMode ? Colors.white : Colors.black),
+                              items: ['전체', '바기오', '클락', '세부', '보홀'].map((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(value, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+                                );
+                              }).toList(),
+                              onChanged: (String? newValue) async {
+                                if (newValue != null) {
+                                  await PreferencesService.setDefaultRegion(newValue);
+                                  // 지역 설정이 변경되면 정보 탭의 현재 선택 지역도 즉시 동기화
+                                  commonRegionNotifier.value = newValue;
+                                  setState(() {});
+                                }
+                              },
+                            );
+                          }
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               Card(
                 color: isDarkMode ? Colors.grey[900] : Colors.white,

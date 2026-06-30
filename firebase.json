@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"uhakae-app","appId":"1:728466681157:android:db520b0f5ac614ed27e22c","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"uhakae-app","configurations":{"android":"1:728466681157:android:db520b0f5ac614ed27e22c","ios":"1:728466681157:ios:2672e9909129d6a827e22c","macos":"1:728466681157:ios:2672e9909129d6a827e22c","web":"1:728466681157:web:e238a9dec662d38227e22c","windows":"1:728466681157:web:310eb225c2448d2e27e22c"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "uhakae-app",
+          "appId": "1:728466681157:android:db520b0f5ac614ed27e22c",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "uhakae-app",
+          "configurations": {
+            "android": "1:728466681157:android:db520b0f5ac614ed27e22c",
+            "ios": "1:728466681157:ios:2672e9909129d6a827e22c",
+            "macos": "1:728466681157:ios:2672e9909129d6a827e22c",
+            "web": "1:728466681157:web:e238a9dec662d38227e22c",
+            "windows": "1:728466681157:web:310eb225c2448d2e27e22c"
+          }
+        }
+      }
+    }
+  },
+  "functions": {
+    "source": "functions"
+  }
+}
