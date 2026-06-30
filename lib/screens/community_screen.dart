@@ -4,6 +4,7 @@ import 'package:study_abroad_app/widgets/admin_personal_notice_tab.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
+import 'dart:async';
 import 'post_write_screen.dart';
 import 'post_detail_screen.dart';
 import '../utils/ui_utils.dart';
@@ -27,10 +28,13 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
   late TabController _tabController;
   int _lastSelectedIndex = 0;
   
-  late Stream<QuerySnapshot> _noticeStream;
+  late StreamSubscription<QuerySnapshot> _noticeSub;
+  late StreamSubscription<QuerySnapshot> _communitySub;
+
+  List<QueryDocumentSnapshot>? _noticeDocs;
+  List<QueryDocumentSnapshot>? _communityDocs;
+
   Stream<QuerySnapshot>? _individualNoticeStream;
-  late Stream<QuerySnapshot> _communityStream;
-  
   bool _isLoadingIndividualNotice = true;
 
   @override
@@ -44,9 +48,33 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
       }
     });
     
-    _noticeStream = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'notice').snapshots();
-    _communityStream = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'community').snapshots();
+    _noticeSub = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'notice').snapshots().listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          _noticeDocs = snapshot.docs;
+        });
+      }
+    });
+
+    _communitySub = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'community').snapshots().listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          _communityDocs = snapshot.docs;
+        });
+      }
+    });
+
     _initIndividualNoticeStream();
+  }
+
+  @override
+  void didUpdateWidget(CommunityScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.region != oldWidget.region) {
+      setState(() {
+        region = widget.region ?? '전체';
+      });
+    }
   }
 
   Future<void> _initIndividualNoticeStream() async {
@@ -79,6 +107,8 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
 
   @override
   void dispose() {
+    _noticeSub.cancel();
+    _communitySub.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -430,33 +460,30 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
 
   Widget _buildPostList(BuildContext context, String category) {
     if (category == 'individual_notice') {
-      if (_isLoadingIndividualNotice) {
+      if (_isLoadingIndividualNotice || _individualNoticeStream == null) {
         return const Center(child: CircularProgressIndicator());
-      }
-      if (_individualNoticeStream == null) {
-        return const Center(child: Text('로그인이 필요하거나 회원 정보를 찾을 수 없습니다.'));
       }
       return StreamBuilder<QuerySnapshot>(
         stream: _individualNoticeStream,
         builder: (context, snapshot) {
-          return _buildListFromSnapshot(context, snapshot, category);
+          if (snapshot.hasError) return const Center(child: Text('게시글을 불러오는 중 오류가 발생했습니다.'));
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          return _buildListFromDocs(context, snapshot.data?.docs ?? [], category);
         },
       );
     }
+    List<QueryDocumentSnapshot>? targetDocs;
+    if (category == 'notice') targetDocs = _noticeDocs;
+    else targetDocs = _communityDocs;
 
-    Stream<QuerySnapshot> stream;
-    if (category == 'notice') stream = _noticeStream;
-    else stream = _communityStream;
+    if (targetDocs == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: stream,
-      builder: (context, snapshot) {
-        return _buildListFromSnapshot(context, snapshot, category);
-      },
-    );
+    return _buildListFromDocs(context, targetDocs, category);
   }
 
-  Widget _buildListFromSnapshot(BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot, String category) {
+  Widget _buildListFromDocs(BuildContext context, List<QueryDocumentSnapshot> originalDocs, String category) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     final user = FirebaseAuth.instance.currentUser;
@@ -467,14 +494,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
       'hdcc6th@gmail.com',
     ].contains(user.email);
 
-    if (snapshot.hasError) {
-      return Center(child: Text('게시글을 불러오는 중 오류가 발생했습니다.', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
-    }
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return Center(child: CircularProgressIndicator(color: isDarkMode ? Colors.white : Colors.blue));
-    }
-
-    var docs = snapshot.data?.docs ?? [];
+    var docs = List<QueryDocumentSnapshot>.from(originalDocs);
     
     // 지역 필터링 (클라이언트 단 처리 - 인덱스 오류 방지)
     if (region != '전체') {
