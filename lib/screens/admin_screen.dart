@@ -24,12 +24,28 @@ class _AdminScreenState extends State<AdminScreen> {
   String _schoolAdminRegionTab = '전체'; // 어학원 관리 탭의 선택된 지역
   
   // 정렬 관련 상태
+  bool _isNoticeDescending = true; // 쪽지 정렬 상태
+  bool _isGeneralNoticeDescending = true; // 공지사항 정렬 상태
+  bool _isCommunityDescending = true; // 자유게시판 정렬 상태
+  
   String _userSortField = 'name';
   bool _userSortDescending = false;
   String _schoolAdminSortField = '어학원명';
   bool _schoolAdminSortDescending = false;
   String _personalNoticeSortField = 'name';
   bool _personalNoticeSortDescending = false;
+
+  late Stream<QuerySnapshot> _adminNoticeStream;
+  late Stream<QuerySnapshot> _adminIndividualNoticeStream;
+  late Stream<QuerySnapshot> _adminCommunityStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _adminNoticeStream = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'notice').snapshots();
+    _adminIndividualNoticeStream = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'individual_notice').snapshots();
+    _adminCommunityStream = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'community').snapshots();
+  }
 
   final List<String> _tabs = ['게시물 관리', '사용자 관리', '어학원 관리', '정보 관리', '컨시어지 관리'];
   final List<String> _regions = ['전체', '바기오', '클락', '세부', '보홀'];
@@ -556,7 +572,7 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
             ),
           ),
-          // 하위 탭 (공지사항, 개별공지, 자유게시판)
+          // 하위 탭 (공지사항, 쪽지, 자유게시판)
           Container(
             decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
@@ -564,7 +580,7 @@ class _AdminScreenState extends State<AdminScreen> {
             child: Row(
               children: [
                 _buildPostAdminSubTabItem('공지사항', isDarkMode),
-                _buildPostAdminSubTabItem('개별공지', isDarkMode),
+                _buildPostAdminSubTabItem('쪽지', isDarkMode),
                 _buildPostAdminSubTabItem('자유게시판', isDarkMode),
               ],
             ),
@@ -573,7 +589,7 @@ class _AdminScreenState extends State<AdminScreen> {
           Expanded(
             child: _postAdminSubTab == '공지사항'
                 ? _buildPostList('notice', isDarkMode)
-                : _postAdminSubTab == '개별공지'
+                : _postAdminSubTab == '쪽지'
                     ? _buildPersonalNoticeTab(isDarkMode)
                     : _buildPostList('community', isDarkMode),
           ),
@@ -1341,11 +1357,13 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _buildPostList(String category, bool isDarkMode) {
+    Stream<QuerySnapshot> stream;
+    if (category == 'notice') stream = _adminNoticeStream;
+    else if (category == 'individual_notice') stream = _adminIndividualNoticeStream;
+    else stream = _adminCommunityStream;
+
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('posts')
-          .where('category', isEqualTo: category)
-          .snapshots(),
+      stream: stream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text('오류가 발생했습니다.', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
@@ -1363,6 +1381,11 @@ class _AdminScreenState extends State<AdminScreen> {
           }).toList();
         }
 
+        bool isDescending = true;
+        if (category == 'notice') isDescending = _isGeneralNoticeDescending;
+        else if (category == 'individual_notice') isDescending = _isNoticeDescending;
+        else if (category == 'community') isDescending = _isCommunityDescending;
+
         var modifiableDocs = List<QueryDocumentSnapshot>.from(docs);
         modifiableDocs.sort((a, b) {
           final aTime = (a.data() as Map<String, dynamic>)['created_at'] as Timestamp?;
@@ -1370,7 +1393,7 @@ class _AdminScreenState extends State<AdminScreen> {
           if (aTime == null && bTime == null) return 0;
           if (aTime == null) return -1;
           if (bTime == null) return 1;
-          return bTime.compareTo(aTime);
+          return isDescending ? bTime.compareTo(aTime) : aTime.compareTo(bTime);
         });
 
         if (modifiableDocs.isEmpty) {
@@ -1449,11 +1472,23 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _buildPostAdminSubTabItem(String title, bool isDarkMode) {
     final isSelected = _postAdminSubTab == title;
+    
+    bool? isDescending;
+    if (title == '공지사항') isDescending = _isGeneralNoticeDescending;
+    else if (title == '쪽지') isDescending = _isNoticeDescending;
+    else if (title == '자유게시판') isDescending = _isCommunityDescending;
+
     return Expanded(
       child: InkWell(
         onTap: () {
           setState(() {
-            _postAdminSubTab = title;
+            if (_postAdminSubTab == title) {
+              if (title == '공지사항') _isGeneralNoticeDescending = !_isGeneralNoticeDescending;
+              else if (title == '쪽지') _isNoticeDescending = !_isNoticeDescending;
+              else if (title == '자유게시판') _isCommunityDescending = !_isCommunityDescending;
+            } else {
+              _postAdminSubTab = title;
+            }
           });
         },
         child: Container(
@@ -1467,12 +1502,21 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ),
           alignment: Alignment.center,
-          child: Text(
-            title,
-            style: TextStyle(
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
+                ),
+              ),
+              if (isDescending != null) ...[
+                const SizedBox(width: 4),
+                Icon(isDescending ? Icons.arrow_downward : Icons.arrow_upward, size: 16, color: isSelected ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87)),
+              ],
+            ],
           ),
         ),
       ),
@@ -1673,148 +1717,220 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   void _showPersonalNoticeUserDialog(BuildContext context, String userId, String userName, bool isDarkMode) {
+    bool isDescending = true; // 정렬 상태
+    
     showDialog(
       context: context,
       builder: (ctx) {
-        return Dialog(
-          backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Container(
-            width: double.infinity,
-            constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('$userName 님의 개별공지 목록', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
-                    IconButton(icon: Icon(Icons.close, color: isDarkMode ? Colors.white54 : Colors.black54), onPressed: () => Navigator.pop(ctx)),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('personal_notices')
-                        .where('userId', isEqualTo: userId)
-                        .snapshots(),
-                    builder: (ctx, snapshot) {
-                      if (snapshot.hasError) {
-                        return Center(child: Text('데이터를 불러오는 중 오류가 발생했습니다: ${snapshot.error}', style: TextStyle(color: Colors.red, fontSize: 12)));
-                      }
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return Center(child: Text('등록된 개별공지가 없습니다.', style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54)));
-                      }
-
-                      final notices = snapshot.data!.docs.toList();
-                      // Dart 메모리에서 정렬 (복합 인덱스 오류 방지 및 형변환 오류 방지)
-                      notices.sort((a, b) {
-                        try {
-                          final aData = a.data() as Map<String, dynamic>;
-                          final bData = b.data() as Map<String, dynamic>;
-                          final aDate = aData['createdAt'] is Timestamp ? aData['createdAt'] as Timestamp : null;
-                          final bDate = bData['createdAt'] is Timestamp ? bData['createdAt'] as Timestamp : null;
-                          
-                          if (aDate == null && bDate == null) return 0;
-                          if (aDate == null) return 1;
-                          if (bDate == null) return -1;
-                          return bDate.compareTo(aDate);
-                        } catch (e) {
-                          return 0;
-                        }
-                      });
-
-                      return ListView.builder(
-                        itemCount: notices.length,
-                        itemBuilder: (ctx, index) {
-                          final notice = notices[index];
-                          final data = notice.data() as Map<String, dynamic>;
-                          final title = data['title'] ?? '제목 없음';
-                          final content = data['content'] ?? '';
-                          final isRead = data['isRead'] as bool? ?? false;
-                          final createdAt = data['createdAt'] as Timestamp?;
-                          final dateStr = createdAt != null 
-                              ? '${createdAt.toDate().year}-${createdAt.toDate().month.toString().padLeft(2, '0')}-${createdAt.toDate().day.toString().padLeft(2, '0')} ${createdAt.toDate().hour.toString().padLeft(2, '0')}:${createdAt.toDate().minute.toString().padLeft(2, '0')}' 
-                              : '날짜 없음';
-                          final imageUrls = data['image_urls'] as List<dynamic>? ?? [];
-                          
-                          final readAt = data['readAt'] as Timestamp?;
-                          String readText = isRead ? '읽음' : '안읽음';
-                          if (isRead && readAt != null) {
-                            readText = '읽음\n${readAt.toDate().year.toString().substring(2)}-${readAt.toDate().month.toString().padLeft(2, '0')}-${readAt.toDate().day.toString().padLeft(2, '0')} ${readAt.toDate().hour.toString().padLeft(2, '0')}:${readAt.toDate().minute.toString().padLeft(2, '0')}';
-                          }
-
-                          return Card(
-                            color: isDarkMode ? Colors.grey[850] : Colors.grey[50],
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              title: Row(
-                                children: [
-                                  Expanded(child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black))),
-                                  if (imageUrls.isNotEmpty)
-                                    Icon(Icons.image, size: 16, color: Colors.blue[400]),
-                                ],
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(dateStr, style: TextStyle(fontSize: 12, color: Colors.blue[400])),
-                                  const SizedBox(height: 4),
-                                  Text(content, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87)),
-                                ],
-                              ),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isRead ? Colors.grey.withOpacity(0.2) : Colors.red.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  readText,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isRead ? Colors.grey : Colors.red,
-                                  ),
-                                ),
-                              ),
-                              isThreeLine: true,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Text('$userName 님의 쪽지 목록', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+                            const SizedBox(width: 4),
+                            GestureDetector(
                               onTap: () {
-                                _showPersonalNoticeEditDialog(context, notice.id, userId, title, content, isDarkMode, initialImageUrls: imageUrls.cast<String>());
+                                setState(() {
+                                  isDescending = !isDescending;
+                                });
                               },
+                              child: Icon(isDescending ? Icons.arrow_downward : Icons.arrow_upward, size: 20, color: isDarkMode ? Colors.white : Colors.black),
                             ),
+                          ],
+                        ),
+                        IconButton(icon: Icon(Icons.close, color: isDarkMode ? Colors.white54 : Colors.black54), onPressed: () => Navigator.pop(ctx)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance.collection('personal_notices')
+                                .where('userId', isEqualTo: userId)
+                                .snapshots(),
+                            builder: (ctx, snapshot) {
+                              if (snapshot.hasError) {
+                                return Center(child: Text('데이터를 불러오는 중 오류가 발생했습니다: ${snapshot.error}', style: TextStyle(color: Colors.red, fontSize: 12)));
+                              }
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                                return Center(child: Text('등록된 쪽지가 없습니다.', style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54)));
+                              }
+
+                              final notices = snapshot.data!.docs.toList();
+                              // Dart 메모리에서 정렬
+                              notices.sort((a, b) {
+                                try {
+                                  final aData = a.data() as Map<String, dynamic>;
+                                  final bData = b.data() as Map<String, dynamic>;
+                                  final aDate = aData['createdAt'] is Timestamp ? aData['createdAt'] as Timestamp : null;
+                                  final bDate = bData['createdAt'] is Timestamp ? bData['createdAt'] as Timestamp : null;
+                                  
+                                  if (aDate == null && bDate == null) return 0;
+                                  if (aDate == null) return 1;
+                                  if (bDate == null) return -1;
+                                  final result = bDate.compareTo(aDate);
+                                  return isDescending ? result : -result;
+                                } catch (e) {
+                                  return 0;
+                                }
+                              });
+
+                          return ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 80), // FAB 가리지 않도록 여백
+                            itemCount: notices.length,
+                            itemBuilder: (ctx, index) {
+                              final notice = notices[index];
+                              final data = notice.data() as Map<String, dynamic>;
+                              final title = data['title'] ?? '제목 없음';
+                              final content = data['content'] ?? '';
+                              final isRead = data['isRead'] as bool? ?? false;
+                              final createdAt = data['createdAt'] as Timestamp?;
+                              final timeAgo = createdAt != null 
+                                  ? '${createdAt.toDate().hour.toString().padLeft(2, '0')}:${createdAt.toDate().minute.toString().padLeft(2, '0')}' 
+                                  : '';
+                              final imageUrls = data['image_urls'] as List<dynamic>? ?? [];
+                              
+                              // 관리자 화면이므로 관리자가 작성한 글(isFromUser != true)이 '내' 글입니다.
+                              final bool isFromMe = data['isFromUser'] != true;
+
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                                child: Row(
+                                  mainAxisAlignment: !isFromMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    if (isFromMe) ...[
+                                      CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                        child: Icon(Icons.admin_panel_settings, size: 20, color: isDarkMode ? Colors.grey : Colors.black54),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    if (!isFromMe)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 4.0, bottom: 4.0),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            if (!isRead) const Text('1', style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
+                                            Text(timeAgo, style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                          ],
+                                        ),
+                                      ),
+                                    Flexible(
+                                      child: InkWell(
+                                        onTap: () {
+                                          _showPersonalNoticeEditDialog(context, notice.id, userId, title, content, isDarkMode, initialImageUrls: imageUrls.cast<String>());
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                          decoration: BoxDecoration(
+                                            color: isFromMe 
+                                                ? (isDarkMode ? Colors.grey[800] : Colors.white)
+                                                : (isDarkMode ? Colors.blue[900] : Colors.blue[100]),
+                                            border: isFromMe ? Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300) : null,
+                                            borderRadius: BorderRadius.only(
+                                              topLeft: const Radius.circular(16),
+                                              topRight: const Radius.circular(16),
+                                              bottomLeft: isFromMe ? const Radius.circular(4) : const Radius.circular(16),
+                                              bottomRight: isFromMe ? const Radius.circular(16) : const Radius.circular(4),
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 14)),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                content, 
+                                                style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87, fontSize: 13),
+                                              ),
+                                              if (imageUrls.isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.image, size: 14, color: isDarkMode ? Colors.white54 : Colors.black54),
+                                                    const SizedBox(width: 4),
+                                                    Text('사진 첨부됨', style: TextStyle(fontSize: 11, color: isDarkMode ? Colors.white54 : Colors.black54)),
+                                                  ],
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (isFromMe)
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 4.0, bottom: 4.0),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (!isRead) const Text('1', style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
+                                            Text(timeAgo, style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                          ],
+                                        ),
+                                      ),
+                                    if (!isFromMe) ...[
+                                      const SizedBox(width: 8),
+                                      CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                        child: Icon(Icons.person, size: 20, color: isDarkMode ? Colors.grey : Colors.black54),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            },
                           );
                         },
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    onPressed: () {
-                      _showPersonalNoticeEditDialog(context, null, userId, '', '', isDarkMode, initialImageUrls: []);
-                    },
-                    child: const Text('신규 개별공지 작성', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                      Positioned(
+                        bottom: 16,
+                        right: 16,
+                        child: FloatingActionButton(
+                          mini: true,
+                          backgroundColor: isDarkMode ? Colors.blue[700] : Colors.white,
+                          child: Icon(Icons.edit, color: isDarkMode ? Colors.white : Colors.black),
+                          onPressed: () {
+                            _showPersonalNoticeEditDialog(context, null, userId, '', '', isDarkMode, initialImageUrls: []);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-        );
-      }
-    );
-  }
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
   void _showPersonalNoticeEditDialog(BuildContext context, String? docId, String userId, String initialTitle, String initialContent, bool isDarkMode, {List<String>? initialImageUrls}) {
     final titleCtrl = TextEditingController(text: initialTitle);
@@ -1832,7 +1948,7 @@ class _AdminScreenState extends State<AdminScreen> {
           builder: (stContext, setSt) {
             return AlertDialog(
               backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
-              title: Text(docId == null ? '신규 개별공지' : '개별공지 수정', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+              title: Text(docId == null ? '신규 쪽지' : '쪽지 수정', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
               content: SingleChildScrollView(
                 child: SizedBox(
                   width: 400,
@@ -2014,6 +2130,8 @@ class _AdminScreenState extends State<AdminScreen> {
                       'image_urls': finalImageUrls,
                       if (docId == null) 'createdAt': FieldValue.serverTimestamp(),
                       if (docId == null) 'isRead': false,
+                      if (docId == null) 'isFromUser': false,
+                      if (docId == null) 'senderName': '관리자',
                       'updatedAt': FieldValue.serverTimestamp(),
                     };
                     

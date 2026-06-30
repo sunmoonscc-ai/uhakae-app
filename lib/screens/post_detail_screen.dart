@@ -12,7 +12,9 @@ class PostDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final category = postData['category'] == 'notice' ? '공지사항' : '자유 게시판';
+    final category = postData['category'] == 'notice' 
+        ? '공지사항' 
+        : (postData['category'] == 'individual_notice' ? '쪽지' : '자유 게시판');
     final postId = postData['id'] as String?;
 
     return Scaffold(
@@ -28,19 +30,6 @@ class PostDetailScreen extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(category, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(width: 12),
-            InkWell(
-              onTap: () => Navigator.pop(context),
-              borderRadius: BorderRadius.circular(4),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  border: Border.all(color: isDarkMode ? Colors.white54 : Colors.black26),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text('목록보기', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 12)),
-              ),
-            ),
           ],
         ),
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
@@ -120,6 +109,10 @@ class PostDetailScreen extends StatelessWidget {
                 );
               }
             ),
+          IconButton(
+            icon: Icon(Icons.close, color: isDarkMode ? Colors.white : Colors.black),
+            onPressed: () => Navigator.pop(context),
+          ),
         ],
       ),
       body: postId == null 
@@ -145,11 +138,11 @@ class PostDetailScreen extends StatelessWidget {
     final title = data['title'] ?? '제목 없음';
     final content = data['content'] ?? '';
     final imageUrls = List<String>.from(data['image_urls'] ?? []);
-    final authorName = data['author_name'] ?? '익명';
+    final authorName = data['author_name'] ?? data['senderName'] ?? (data['isFromUser'] == true ? '나' : (data['isFromUser'] == false ? '관리자' : '익명'));
     
     String dateStr = '';
-    if (data['created_at'] != null) {
-      final Timestamp ts = data['created_at'];
+    final Timestamp? ts = data['created_at'] as Timestamp? ?? data['createdAt'] as Timestamp?;
+    if (ts != null) {
       final DateTime dt = ts.toDate();
       dateStr = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     }

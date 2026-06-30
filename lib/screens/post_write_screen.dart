@@ -183,19 +183,6 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
             ),
             const SizedBox(width: 8),
             Text('글쓰기', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(width: 12),
-            InkWell(
-              onTap: () => Navigator.pop(context),
-              borderRadius: BorderRadius.circular(4),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  border: Border.all(color: isDarkMode ? Colors.white54 : Colors.black26),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text('목록보기', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 12)),
-              ),
-            ),
           ],
         ),
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
@@ -207,6 +194,10 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
             child: _isSaving 
               ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: isDarkMode ? Colors.white : Colors.black, strokeWidth: 2))
               : Text(widget.editPostId != null ? '수정' : '등록', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+          IconButton(
+            icon: Icon(Icons.close, color: isDarkMode ? Colors.white : Colors.black),
+            onPressed: () => Navigator.pop(context),
           ),
         ],
       ),
@@ -225,7 +216,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                     style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                     items: const [
                       DropdownMenuItem(value: 'notice', child: Text('공지사항')),
-                      DropdownMenuItem(value: 'individual_notice', child: Text('개별공지')),
+                      DropdownMenuItem(value: 'individual_notice', child: Text('쪽지')),
                       DropdownMenuItem(value: 'community', child: Text('자유 게시판')),
                     ],
                     onChanged: (val) {

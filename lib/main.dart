@@ -110,7 +110,8 @@ class _MainScreenState extends State<MainScreen> {
           _selectedIndex = 0;
         });
       } else if (user != null && mounted) {
-        if (!PreferencesService.isAdmin) {
+        // 권한 검증 및 로그아웃은 LoginScreen에서 모두 처리하므로, 여기서는 새 알림(개별공지) 체크만 수행합니다.
+        try {
           final result = await FirebaseFirestore.instance
               .collection('users')
               .where('email', isEqualTo: user.email)
@@ -120,31 +121,14 @@ class _MainScreenState extends State<MainScreen> {
           if (result.docs.isNotEmpty) {
             final userDoc = result.docs.first;
             final level = userDoc.data()['level'] as String? ?? '정회원';
-            if (level != '정회원') {
-              await FirebaseAuth.instance.signOut();
-              await GoogleSignIn(
-                clientId: '728466681157-hqbrfqmv0fu4s5jibin426sn027ah32v.apps.googleusercontent.com',
-              ).signOut();
-            } else {
+            
+            // 승인된 회원인 경우에만 알림 체크
+            if (level == '정회원') {
               _checkPersonalNotices(userDoc.id);
             }
-          } else {
-            await FirebaseAuth.instance.signOut();
-            await GoogleSignIn(
-              clientId: '728466681157-hqbrfqmv0fu4s5jibin426sn027ah32v.apps.googleusercontent.com',
-            ).signOut();
           }
-        } else {
-          // 어드민일 경우에도 개별공지 체크가 필요한지? 보통 어드민은 개별공지 받는 주체가 아니지만,
-          // DB에 본인 이메일로 생성된 문서가 있다면 체크.
-          final result = await FirebaseFirestore.instance
-              .collection('users')
-              .where('email', isEqualTo: user.email)
-              .limit(1)
-              .get();
-          if (result.docs.isNotEmpty) {
-            _checkPersonalNotices(result.docs.first.id);
-          }
+        } catch (e) {
+          debugPrint('Error checking user level: $e');
         }
       }
     });
