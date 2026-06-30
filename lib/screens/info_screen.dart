@@ -18,8 +18,8 @@ final List<String> infoMainCategories = [
 ];
 
 // 공통 지역 카테고리 (2단)
-final ValueNotifier<String> commonRegionNotifier = ValueNotifier<String>('전체');
-final List<String> commonRegions = ['전체', '바기오', '클락', '세부', '보홀'];
+final ValueNotifier<String> commonRegionNotifier = ValueNotifier<String>('바기오');
+final List<String> commonRegions = ['바기오', '클락', '세부', '보홀'];
 
 // 지역 하위 카테고리 (3단)
 final ValueNotifier<String> regionSubCategoryNotifier = ValueNotifier<String>('레저');
@@ -55,11 +55,15 @@ class _InfoScreenState extends State<InfoScreen> {
   @override
   void initState() {
     super.initState();
-    if (PreferencesService.isAdmin) {
-      commonRegionNotifier.value = PreferencesService.defaultRegion;
-    } else {
-      commonRegionNotifier.value = PreferencesService.userRegion;
+    String initialRegion = PreferencesService.isAdmin 
+        ? PreferencesService.defaultRegion 
+        : PreferencesService.userRegion;
+    
+    if (initialRegion == '전체' || !commonRegions.contains(initialRegion)) {
+      initialRegion = '바기오';
     }
+    commonRegionNotifier.value = initialRegion;
+
     for (var cat in regionSubCategories) {
       _subCatKeys[cat['label']] = GlobalKey();
     }

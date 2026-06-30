@@ -151,17 +151,18 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _checkPersonalNotices(String userId) async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('personal_notices')
-        .where('userId', isEqualTo: userId)
-        .where('isRead', isEqualTo: false)
-        .get();
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('personal_notices')
+          .where('userId', isEqualTo: userId)
+          .where('isRead', isEqualTo: false)
+          .get();
 
-    if (snapshot.docs.isNotEmpty) {
-      if (!mounted) return;
-      final notices = snapshot.docs;
-      
-      showDialog(
+      if (snapshot.docs.isNotEmpty) {
+        if (!mounted) return;
+        final notices = snapshot.docs;
+        
+        showDialog(
         context: context,
         builder: (ctx) {
           final bool isDarkMode = Theme.of(ctx).brightness == Brightness.dark;
@@ -177,11 +178,20 @@ class _MainScreenState extends State<MainScreen> {
                   final data = notices[index].data();
                   final title = data['title'] ?? '제목 없음';
                   final content = data['content'] ?? '';
-                  final createdAt = data['createdAt'] as Timestamp?;
+                  
+                  Timestamp? createdAt;
+                  if (data['createdAt'] is Timestamp) {
+                    createdAt = data['createdAt'] as Timestamp;
+                  }
+                  
                   final dateStr = createdAt != null 
                       ? '${createdAt.toDate().year}-${createdAt.toDate().month.toString().padLeft(2, '0')}-${createdAt.toDate().day.toString().padLeft(2, '0')}' 
                       : '';
-                  final imageUrls = data['image_urls'] as List<dynamic>? ?? [];
+                  
+                  List<String> imageUrls = [];
+                  if (data['image_urls'] is List) {
+                    imageUrls = (data['image_urls'] as List).map((e) => e.toString()).toList();
+                  }
                   
                   return Card(
                     color: isDarkMode ? Colors.grey[850] : Colors.grey[50],
@@ -245,6 +255,9 @@ class _MainScreenState extends State<MainScreen> {
           );
         },
       );
+    }
+  } catch (e) {
+      debugPrint('Error checking personal notices: $e');
     }
   }
 
