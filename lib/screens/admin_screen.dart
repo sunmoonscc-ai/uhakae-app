@@ -567,7 +567,7 @@ class _AdminScreenState extends State<AdminScreen> {
         title: Row(
           children: [
             Image.asset(
-              Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
+              'assets/images/logo.png',
               height: 32,
               errorBuilder: (context, error, stackTrace) => Icon(Icons.admin_panel_settings, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
             ),

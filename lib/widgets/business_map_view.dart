@@ -4,7 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../models/business_model.dart';
 import '../screens/business_detail_screen.dart';
 
-class BusinessMapView extends StatelessWidget {
+class BusinessMapView extends StatefulWidget {
   final List<BusinessModel> businesses;
   final LatLng? initialCenter;
   final double initialZoom;
@@ -17,10 +17,23 @@ class BusinessMapView extends StatelessWidget {
   });
 
   @override
+  State<BusinessMapView> createState() => _BusinessMapViewState();
+}
+
+class _BusinessMapViewState extends State<BusinessMapView> {
+  final MapController _mapController = MapController();
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // 필터링: 좌표(address3)가 있는 업체만
     final List<Map<String, dynamic>> validMarkers = [];
-    for (var b in businesses) {
+    for (var b in widget.businesses) {
       if (b.address3.isNotEmpty) {
         try {
           final parts = b.address3.split(',');
@@ -39,8 +52,8 @@ class BusinessMapView extends StatelessWidget {
     }
 
     // 초기 중심 좌표 설정: 지정된 값이 없으면 마커들의 평균 위치, 마커도 없으면 기본 세부 중심 좌표
-    LatLng center = initialCenter ?? const LatLng(10.3157, 123.8854); // Cebu City 기본값
-    if (initialCenter == null && validMarkers.isNotEmpty) {
+    LatLng center = widget.initialCenter ?? const LatLng(10.3157, 123.8854); // Cebu City 기본값
+    if (widget.initialCenter == null && validMarkers.isNotEmpty) {
       double sumLat = 0;
       double sumLng = 0;
       for (var m in validMarkers) {
@@ -50,18 +63,29 @@ class BusinessMapView extends StatelessWidget {
       center = LatLng(sumLat / validMarkers.length, sumLng / validMarkers.length);
     }
 
-    return FlutterMap(
-      options: MapOptions(
-        initialCenter: center,
-        initialZoom: initialZoom,
-      ),
+    return Stack(
       children: [
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: widget.initialZoom,
+          ),
+          children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.uhakae.app',
         ),
         MarkerLayer(
-          markers: validMarkers.map((m) {
+          markers: [
+            if (widget.initialCenter != null)
+              Marker(
+                point: widget.initialCenter!,
+                width: 40,
+                height: 40,
+                child: const Icon(Icons.my_location, color: Colors.red, size: 30),
+              ),
+            ...validMarkers.map((m) {
             final b = m['business'] as BusinessModel;
             final point = m['point'] as LatLng;
             return Marker(
@@ -100,8 +124,24 @@ class BusinessMapView extends StatelessWidget {
                 ),
               ),
             );
-          }).toList(),
+            }).toList(),
+          ],
         ),
+      ],
+        ),
+        if (widget.initialCenter != null)
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: FloatingActionButton(
+              mini: true,
+              backgroundColor: Colors.white,
+              onPressed: () {
+                _mapController.move(widget.initialCenter!, widget.initialZoom);
+              },
+              child: const Icon(Icons.my_location, color: Colors.blue),
+            ),
+          ),
       ],
     );
   }

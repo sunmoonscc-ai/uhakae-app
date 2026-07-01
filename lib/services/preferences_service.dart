@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PreferencesService {
   static late final SharedPreferences _prefs;
@@ -72,10 +73,61 @@ class PreferencesService {
     await _prefs.setString(_userRegionKey, value);
   }
 
-  // --- 즐겨찾기(Favorites) ---
+// --- 즐겨찾기(Favorites) ---
   static List<Map<String, dynamic>> get favorites {
     final strList = _prefs.getStringList(_favoritesKey) ?? [];
     return strList.map((str) => jsonDecode(str) as Map<String, dynamic>).toList();
+  }
+
+  static Future<void> _syncToFirestore() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'favorites': favorites,
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Error syncing favorites to firestore: $e');
+      }
+    }
+  }
+
+  static Future<void> syncFavoritesWithFirestore(String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && data['favorites'] is List) {
+          final List<dynamic> remoteList = data['favorites'];
+          final remoteFavorites = remoteList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          
+          final localFavorites = favorites;
+          final Map<String, Map<String, dynamic>> mergedMap = {};
+          
+          // 리모트를 맵에 추가
+          for (var item in remoteFavorites) {
+            mergedMap[item['id'].toString()] = item;
+          }
+          // 로컬을 맵에 추가 (로컬을 덮어씌움)
+          for (var item in localFavorites) {
+            mergedMap[item['id'].toString()] = item;
+          }
+          
+          final mergedList = mergedMap.values.toList();
+          final strList = mergedList.map((e) => jsonEncode(e)).toList();
+          await _prefs.setStringList(_favoritesKey, strList);
+          favoritesNotifier.value = mergedList;
+          
+          // 병합된 결과를 서버에 업로드
+          await _syncToFirestore();
+        } else {
+          // 서버에 배열이 없으면 로컬 내용으로 서버 생성
+          await _syncToFirestore();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error merging favorites from firestore: $e');
+    }
   }
 
   static Future<void> addFavorite(Map<String, dynamic> item) async {
@@ -85,6 +137,7 @@ class PreferencesService {
       final strList = list.map((e) => jsonEncode(e)).toList();
       await _prefs.setStringList(_favoritesKey, strList);
       favoritesNotifier.value = list;
+      await _syncToFirestore();
     }
   }
 
@@ -94,6 +147,7 @@ class PreferencesService {
     final strList = list.map((e) => jsonEncode(e)).toList();
     await _prefs.setStringList(_favoritesKey, strList);
     favoritesNotifier.value = list;
+    await _syncToFirestore();
   }
 
   static Future<void> updateFavoriteBusinessData(String id, Map<String, dynamic> businessData) async {
@@ -105,6 +159,7 @@ class PreferencesService {
       final strList = list.map((e) => jsonEncode(e)).toList();
       await _prefs.setStringList(_favoritesKey, strList);
       favoritesNotifier.value = list;
+      await _syncToFirestore();
     }
   }
 

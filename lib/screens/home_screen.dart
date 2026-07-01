@@ -25,7 +25,7 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: isDarkMode ? Colors.black : Colors.white,
+        backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
         elevation: 0,
         title: Row(
           children: [
@@ -33,10 +33,27 @@ class HomeScreen extends StatelessWidget {
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: () => onNavigateTab?.call(0),
-                child: Image.asset(
-                  isDarkMode ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
-                  height: 32,
-                  errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/images/logo.png',
+                        height: 40,
+                        errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '유학애',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : const Color(0xFF0C6780),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 22,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -54,13 +71,23 @@ class HomeScreen extends StatelessWidget {
                   final String name = (user != null && user.displayName != null && user.displayName!.isNotEmpty) 
                       ? user.displayName! 
                       : (user != null ? '회원' : '게스트');
-                  return Text(
-                    '안녕하세요, $name님!',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                  return StreamBuilder<DocumentSnapshot>(
+                    stream: user != null 
+                        ? FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots()
+                        : null,
+                    builder: (context, userSnapshot) {
+                      final points = (userSnapshot.hasData && userSnapshot.data!.exists) 
+                          ? (userSnapshot.data!.data() as Map<String, dynamic>)['points'] ?? 0 
+                          : 0;
+                      return Text(
+                        '안녕하세요, $name님! (point $points)',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      );
+                    },
                   );
                 },
               ),

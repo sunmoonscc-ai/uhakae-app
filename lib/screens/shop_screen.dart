@@ -75,8 +75,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
               child: GestureDetector(
                 onTap: widget.onNavigateHome,
                 child: Image.asset(
-                  Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
-                  height: 32,
+                  'assets/images/logo.png',
                   errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
                 ),
               ),

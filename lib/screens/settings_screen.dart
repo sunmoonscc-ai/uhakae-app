@@ -22,9 +22,7 @@ class SettingsScreen extends StatelessWidget {
         title: Row(
           children: [
             Image.asset(
-              Theme.of(context).brightness == Brightness.dark
-                  ? 'assets/images/logo_dark.png'
-                  : 'assets/images/logo.png',
+              'assets/images/logo.png',
               height: 32,
               errorBuilder: (context, error, stackTrace) => Icon(
                 Icons.settings,

@@ -313,7 +313,7 @@ class _AddBusinessDialogState extends State<AddBusinessDialog> {
 
         String thumbnailUrl = relatedUrls.isNotEmpty 
             ? relatedUrls.first 
-            : (providerUrls.isNotEmpty ? providerUrls.first : '');
+            : '';
 
         final Map<String, dynamic> data = {
           'category': '지역',

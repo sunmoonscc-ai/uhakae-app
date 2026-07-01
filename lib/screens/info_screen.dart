@@ -168,7 +168,7 @@ class _InfoScreenState extends State<InfoScreen> {
               child: GestureDetector(
                 onTap: widget.onNavigateHome,
                 child: Image.asset(
-                  isDarkMode ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
+                  'assets/images/logo.png',
                   height: 32,
                   errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
                 ),
@@ -498,6 +498,7 @@ class _InfoScreenState extends State<InfoScreen> {
                                                 onTap: () {
                                                   setState(() {
                                                     _sortMode = _sortMode == 'name_asc' ? 'name_desc' : 'name_asc';
+                                                    if (_showMap) _showMap = false;
                                                   });
                                                 },
                                                 child: Container(
@@ -522,6 +523,7 @@ class _InfoScreenState extends State<InfoScreen> {
                                                   } else {
                                                     setState(() {
                                                       _sortMode = _sortMode == 'dist_asc' ? 'dist_desc' : 'dist_asc';
+                                                      if (_showMap) _showMap = false;
                                                     });
                                                   }
                                                 },
@@ -595,6 +597,7 @@ class _InfoScreenState extends State<InfoScreen> {
                                                   initialCenter: _currentPosition != null 
                                                       ? latlong.LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
                                                       : null,
+                                                  initialZoom: 16.5,
                                                 )
                                               : ListView.builder(
                                                   itemCount: businesses.length,

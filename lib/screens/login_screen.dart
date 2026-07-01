@@ -231,6 +231,10 @@ class _LoginScreenState extends State<LoginScreen> {
             await PreferencesService.setAdmin(true);
             await PreferencesService.setUserRegion('전체'); // 관리자는 전체
           }
+          
+          // 로그인 성공 시 서버 즐겨찾기 동기화
+          await PreferencesService.syncFavoritesWithFirestore(user.uid);
+
           if (mounted) {
             Navigator.pop(context, true); // 로그인 성공
           }
@@ -275,9 +279,7 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Image.asset(
-                isDarkMode
-                    ? 'assets/images/logo_dark.png'
-                    : 'assets/images/logo.png',
+                'assets/images/logo.png',
                 height: 80,
                 errorBuilder: (context, error, stackTrace) => Icon(
                   Icons.school,

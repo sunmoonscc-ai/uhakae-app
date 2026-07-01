@@ -11,6 +11,7 @@ import 'screens/shop_screen.dart';
 import 'screens/info_screen.dart';
 import 'services/preferences_service.dart';
 import 'widgets/global_upload_indicator.dart';
+import 'utils/time_utils.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -133,9 +134,10 @@ class _MainScreenState extends State<MainScreen> {
             final userDoc = result.docs.first;
             final level = userDoc.data()['level'] as String? ?? '정회원';
 
-            // 승인된 회원인 경우에만 알림 체크
+            // 승인된 회원인 경우에만 알림 체크 및 일일 포인트 체크
             if (level == '정회원') {
               _checkPersonalNotices(userDoc.id);
+              _checkDailyPoints(userDoc);
             }
           }
         } catch (e) {
@@ -143,6 +145,24 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
     });
+  }
+
+  void _checkDailyPoints(QueryDocumentSnapshot userDoc) async {
+    try {
+      final data = userDoc.data() as Map<String, dynamic>;
+      final lastPointDate = data['last_point_date'] as String? ?? '';
+      final todayDate = TimeUtils.getPhilippineDateString();
+      
+      if (lastPointDate != todayDate) {
+        // 포인트 10 추가하고 last_point_date 오늘로 변경
+        await FirebaseFirestore.instance.collection('users').doc(userDoc.id).update({
+          'points': FieldValue.increment(10),
+          'last_point_date': todayDate,
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking daily points: $e');
+    }
   }
 
   void _checkPersonalNotices(String userId) async {

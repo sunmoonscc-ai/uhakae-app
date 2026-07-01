@@ -5,6 +5,11 @@ class TimeUtils {
     return DateTime.now().toUtc().add(const Duration(hours: 8));
   }
 
+  static String getPhilippineDateString() {
+    final phTime = getPhilippineTime();
+    return '${phTime.year}-${phTime.month.toString().padLeft(2, '0')}-${phTime.day.toString().padLeft(2, '0')}';
+  }
+
   static bool isOpenNow(String operatingHours) {
     if (operatingHours.trim().isEmpty) return false;
     
