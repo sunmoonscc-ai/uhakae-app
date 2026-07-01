@@ -71,7 +71,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
   @override
   Widget build(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     if (_isLoading) {
       return Center(
         child: Column(
@@ -81,13 +81,15 @@ class _WeatherScreenState extends State<WeatherScreen> {
               'https://assets9.lottiefiles.com/packages/lf20_jmzpqz5p.json',
               width: 150,
               height: 150,
-              errorBuilder: (context, error, stackTrace) => 
+              errorBuilder: (context, error, stackTrace) =>
                   Icon(Icons.cloud_sync, size: 80, color: Colors.blue[300]),
             ),
             const SizedBox(height: 16),
             Text(
               '현재 위치의 날씨를 불러오는 중입니다...',
-              style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Colors.black54,
+              ),
             ),
           ],
         ),
@@ -106,7 +108,9 @@ class _WeatherScreenState extends State<WeatherScreen> {
               Text(
                 '오류가 발생했습니다:\n$_errorMessage',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                ),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
@@ -145,7 +149,10 @@ class _WeatherScreenState extends State<WeatherScreen> {
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.refresh, color: isDarkMode ? Colors.white70 : Colors.black54),
+                icon: Icon(
+                  Icons.refresh,
+                  color: isDarkMode ? Colors.white70 : Colors.black54,
+                ),
                 onPressed: () {
                   setState(() {
                     _isLoading = true;
@@ -158,16 +165,19 @@ class _WeatherScreenState extends State<WeatherScreen> {
           const SizedBox(height: 8),
           Text(
             '현재 날씨 정보',
-            style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white54 : Colors.grey[600]),
+            style: TextStyle(
+              fontSize: 14,
+              color: isDarkMode ? Colors.white54 : Colors.grey[600],
+            ),
           ),
           const SizedBox(height: 24),
-          
+
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: isDarkMode 
-                    ? [Colors.blueGrey[900]!, Colors.blueGrey[800]!] 
+                colors: isDarkMode
+                    ? [Colors.blueGrey[900]!, Colors.blueGrey[800]!]
                     : [Colors.blue[400]!, Colors.blue[300]!],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -175,7 +185,9 @@ class _WeatherScreenState extends State<WeatherScreen> {
               borderRadius: BorderRadius.circular(32),
               boxShadow: [
                 BoxShadow(
-                  color: (isDarkMode ? Colors.black : Colors.blue).withOpacity(0.3),
+                  color: (isDarkMode ? Colors.black : Colors.blue).withOpacity(
+                    0.3,
+                  ),
                   blurRadius: 15,
                   offset: const Offset(0, 10),
                 ),
@@ -190,7 +202,11 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       data.conditionIconUrl,
                       width: 40,
                       height: 40,
-                      errorBuilder: (c, e, s) => const Icon(Icons.cloud, size: 40, color: Colors.white),
+                      errorBuilder: (c, e, s) => const Icon(
+                        Icons.cloud,
+                        size: 40,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -206,24 +222,42 @@ class _WeatherScreenState extends State<WeatherScreen> {
                 const SizedBox(height: 4),
                 Text(
                   data.conditionText,
-                  style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildWeatherInfoItem(Icons.thermostat, '체감온도', '${data.feelsLikeC}°C'),
-                    _buildWeatherInfoItem(Icons.water_drop, '습도', '${data.humidity}%'),
-                    _buildWeatherInfoItem(Icons.air, '풍속', '${data.windKph}km/h'),
+                    _buildWeatherInfoItem(
+                      Icons.thermostat,
+                      '체감온도',
+                      '${data.feelsLikeC}°C',
+                    ),
+                    _buildWeatherInfoItem(
+                      Icons.water_drop,
+                      '습도',
+                      '${data.humidity}%',
+                    ),
+                    _buildWeatherInfoItem(
+                      Icons.air,
+                      '풍속',
+                      '${data.windKph}km/h',
+                    ),
                   ],
                 ),
               ],
             ),
           ),
           const SizedBox(height: 32),
-          if (data.hourlyForecast.isNotEmpty) _buildHourlyChart(data.hourlyForecast, isDarkMode),
+          if (data.hourlyForecast.isNotEmpty)
+            _buildHourlyChart(data.hourlyForecast, isDarkMode),
           const SizedBox(height: 32),
-          if (data.dailyForecast.isNotEmpty) _buildDailyForecast(data.dailyForecast, isDarkMode),
+          if (data.dailyForecast.isNotEmpty)
+            _buildDailyForecast(data.dailyForecast, isDarkMode),
         ],
       ),
     );
@@ -236,7 +270,11 @@ class _WeatherScreenState extends State<WeatherScreen> {
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
@@ -289,7 +327,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       hour.conditionIconUrl,
                       width: 32,
                       height: 32,
-                      errorBuilder: (c, e, s) => const Icon(Icons.cloud, size: 24),
+                      errorBuilder: (c, e, s) =>
+                          const Icon(Icons.cloud, size: 24),
                     ),
                     Text(
                       '${hour.tempC.round()}°',
@@ -303,7 +342,11 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.water_drop, size: 10, color: Colors.blue[400]),
+                          Icon(
+                            Icons.water_drop,
+                            size: 10,
+                            color: Colors.blue[400],
+                          ),
                           Text(
                             '${hour.chanceOfRain}%',
                             style: TextStyle(
@@ -345,9 +388,12 @@ class _WeatherScreenState extends State<WeatherScreen> {
           itemBuilder: (context, index) {
             final day = dailyData[index];
             String dayLabel = day.date;
-            if (index == 0) dayLabel = '오늘';
-            else if (index == 1) dayLabel = '내일';
-            else if (index == 2) dayLabel = '모레';
+            if (index == 0) {
+              dayLabel = '오늘';
+            } else if (index == 1)
+              dayLabel = '내일';
+            else if (index == 2)
+              dayLabel = '모레';
 
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -360,7 +406,9 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       dayLabel,
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: index == 0 ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: index == 0
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                         color: isDarkMode ? Colors.white : Colors.black87,
                       ),
                     ),
@@ -371,7 +419,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       day.conditionIconUrl,
                       width: 32,
                       height: 32,
-                      errorBuilder: (c, e, s) => const Icon(Icons.cloud, size: 32),
+                      errorBuilder: (c, e, s) =>
+                          const Icon(Icons.cloud, size: 32),
                     ),
                   ),
                   Expanded(
@@ -381,21 +430,29 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       children: [
                         Text(
                           '${day.minTempC.toStringAsFixed(1)}°',
-                          style: TextStyle(color: Colors.blue[300], fontSize: 16),
+                          style: TextStyle(
+                            color: Colors.blue[300],
+                            fontSize: 16,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Container(
                           width: 40,
                           height: 4,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [Colors.blue, Colors.red]),
+                            gradient: const LinearGradient(
+                              colors: [Colors.blue, Colors.red],
+                            ),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           '${day.maxTempC.toStringAsFixed(1)}°',
-                          style: TextStyle(color: Colors.red[300], fontSize: 16),
+                          style: TextStyle(
+                            color: Colors.red[300],
+                            fontSize: 16,
+                          ),
                         ),
                       ],
                     ),

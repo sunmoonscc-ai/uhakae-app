@@ -1,6 +1,7 @@
 import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/preferences_service.dart';
 
 class ShopScreen extends StatefulWidget {
   final VoidCallback? onNavigateHome;
@@ -90,6 +91,38 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
             ),
           ],
         ),
+        actions: [
+          ValueListenableBuilder<List<Map<String, dynamic>>>(
+            valueListenable: PreferencesService.favoritesNotifier,
+            builder: (context, favorites, _) {
+              final id = 'menu_컨시어지';
+              final isFav = PreferencesService.isFavorite(id);
+              final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+              return IconButton(
+                icon: Icon(
+                  isFav ? Icons.star : Icons.star_border,
+                  color: isFav ? Colors.amber : (isDarkMode ? Colors.white : Colors.black),
+                ),
+                onPressed: () {
+                  if (isFav) {
+                    PreferencesService.removeFavorite(id);
+                  } else {
+                    PreferencesService.addFavorite({
+                      'id': id,
+                      'type': 'menu',
+                      'title': '컨시어지',
+                      'iconCodePoint': Icons.shopping_cart.codePoint,
+                      'iconFontFamily': Icons.shopping_cart.fontFamily,
+                      'colorValue': 0xFFFFF9C4,
+                      'mainTab': '컨시어지',
+                      'tabIndex': 1,
+                    });
+                  }
+                },
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

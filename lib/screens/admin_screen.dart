@@ -1,11 +1,19 @@
 import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../services/firebase_storage_service.dart';
 import 'school_admin_detail_screen.dart';
 import 'post_detail_screen.dart';
+import '../models/business_model.dart';
+import '../widgets/business_card.dart';
+import '../widgets/add_business_dialog.dart';
+import 'business_detail_screen.dart';
+import 'info_screen.dart'; // for regionSubCategories
+import '../utils/time_utils.dart';
+import '../services/preferences_service.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -15,13 +23,20 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
-  String _selectedTab = '사용자 관리';
+  String _selectedTab = '대시보드';
   String _postAdminRegion = '전체';
   String _postAdminSubTab = '공지사항'; // 게시물 관리 하위 탭
   String _userAdminRegion = '전체'; // 사용자 관리 탭의 선택된 지역
   String _userAdminSchool = '어학원 선택'; // 사용자 관리 탭의 선택된 어학원
   String _userAdminSubTab = '전체 회원'; // '신청자', '전체 회원', '연수종료'
   String _schoolAdminRegionTab = '전체'; // 어학원 관리 탭의 선택된 지역
+  String _adminInfoRegion = '바기오'; // 정보 관리 탭 지역
+  String _adminInfoSubCategory = '전체'; // 정보 관리 탭 카테고리
+  String _infoSuggestionStatus = 'pending'; // 'pending' or 'completed'
+  
+  String _adminInfoSortMode = 'name_asc'; // 'name_asc', 'name_desc', 'dist_asc', 'dist_desc'
+  bool _adminInfoOpenNowFilter = false;
+  Position? _currentPosition;
   
   // 정렬 관련 상태
   bool _isNoticeDescending = true; // 쪽지 정렬 상태
@@ -42,12 +57,87 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   void initState() {
     super.initState();
+    
+    final String defaultRegion = PreferencesService.defaultRegion;
+    if (_regions.contains(defaultRegion)) {
+      _postAdminRegion = defaultRegion;
+      _userAdminRegion = defaultRegion;
+      _schoolAdminRegionTab = defaultRegion;
+    }
+    
+    if (commonRegions.contains(defaultRegion)) {
+      _adminInfoRegion = defaultRegion;
+    } else {
+      _adminInfoRegion = '바기오';
+    }
+
     _adminNoticeStream = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'notice').snapshots();
     _adminIndividualNoticeStream = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'individual_notice').snapshots();
     _adminCommunityStream = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'community').snapshots();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingSuggestions();
+    });
   }
 
-  final List<String> _tabs = ['게시물 관리', '사용자 관리', '어학원 관리', '정보 관리', '컨시어지 관리'];
+  Future<void> _checkPendingSuggestions() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('info_suggestions').where('status', isEqualTo: 'pending').get();
+      if (snapshot.docs.isNotEmpty && mounted) {
+        UiUtils.showPopup(context, '새로운 정보 제보가 ${snapshot.docs.length}건 있습니다.\n정보 관리 탭에서 확인해주세요.');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _requestLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) UiUtils.showPopup(context, '위치 서비스가 비활성화되어 있습니다.');
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (mounted) UiUtils.showPopup(context, '위치 권한이 거부되었습니다.');
+        return;
+      }
+    }
+    
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) UiUtils.showPopup(context, '위치 권한이 영구적으로 거부되었습니다.');
+      return;
+    }
+
+    final pos = await Geolocator.getCurrentPosition();
+    setState(() {
+      _currentPosition = pos;
+      _adminInfoSortMode = 'dist_asc';
+    });
+  }
+
+  double _getDistance(BusinessModel b) {
+    if (_currentPosition == null || b.address3.isEmpty) return double.maxFinite;
+    final parts = b.address3.split(',');
+    if (parts.length >= 2) {
+      try {
+        final lat = double.parse(parts[0].trim());
+        final lng = double.parse(parts[1].trim());
+        return Geolocator.distanceBetween(_currentPosition!.latitude, _currentPosition!.longitude, lat, lng);
+      } catch (e) {
+        return double.maxFinite;
+      }
+    }
+    return double.maxFinite;
+  }
+
+  final List<String> _tabs = ['대시보드', '게시물', '사용자', '어학원', '정보', '컨시어지'];
   final List<String> _regions = ['전체', '바기오', '클락', '세부', '보홀'];
   
   final List<String> _schoolList = [
@@ -536,7 +626,11 @@ class _AdminScreenState extends State<AdminScreen> {
   Widget _buildTabContent() {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    if (_selectedTab == '게시물 관리') {
+    if (_selectedTab == '대시보드') {
+      return _buildDashboardTab(isDarkMode);
+    }
+
+    if (_selectedTab == '게시물') {
       return Column(
         children: [
           // 지역 선택 바
@@ -597,7 +691,7 @@ class _AdminScreenState extends State<AdminScreen> {
       );
     }
 
-    if (_selectedTab == '사용자 관리') {
+    if (_selectedTab == '사용자') {
       // 선택된 지역에 따른 어학원 목록 필터링
       List<String> availableSchools = ['어학원 선택'];
       if (_userAdminRegion == '전체') {
@@ -693,7 +787,7 @@ class _AdminScreenState extends State<AdminScreen> {
       );
     }
 
-    if (_selectedTab == '어학원 관리') {
+    if (_selectedTab == '어학원') {
       final List<String> regions = ['전체', '바기오', '클락', '세부', '보홀'];
       
       final sortedSchools = _schoolList
@@ -896,7 +990,7 @@ class _AdminScreenState extends State<AdminScreen> {
       );
     }
 
-    if (_selectedTab == '컨시어지 관리') {
+    if (_selectedTab == '컨시어지') {
       return StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('orders')
@@ -1000,8 +1094,432 @@ class _AdminScreenState extends State<AdminScreen> {
                     },
                   );
     }
+    if (_selectedTab == '정보') {
+      return _buildInfoAdminTab(isDarkMode);
+    }
     
     return Center(child: Text('$_selectedTab 기능은 준비 중입니다.'));
+  }
+
+  Widget _buildInfoAdminTab(bool isDarkMode) {
+    return Column(
+      children: [
+        // 탭: 대기중 / 완료
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: ToggleButtons(
+                isSelected: [_infoSuggestionStatus == 'pending', _infoSuggestionStatus == 'completed'],
+                onPressed: (index) {
+                  setState(() {
+                    _infoSuggestionStatus = index == 0 ? 'pending' : 'completed';
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                constraints: const BoxConstraints(minHeight: 32, minWidth: 80),
+                children: const [
+                  Text('대기중'),
+                  Text('확인 완료'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        // 제보 리스트 (상단 고정 높이 4줄 정도 스크롤)
+        Container(
+          height: 200,
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
+          ),
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('info_suggestions').orderBy('createdAt', descending: true).snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) return const Center(child: Text('오류가 발생했습니다.'));
+              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+
+              final allDocs = snapshot.data?.docs ?? [];
+              final docs = allDocs.where((doc) {
+                final status = (doc.data() as Map<String, dynamic>)['status'] ?? 'pending';
+                if (_infoSuggestionStatus == 'pending') return status == 'pending';
+                return status != 'pending';
+              }).toList();
+
+              if (docs.isEmpty) return const Center(child: Text('해당 상태의 제보가 없습니다.'));
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: docs.length,
+                itemBuilder: (context, index) {
+                  final data = docs[index].data() as Map<String, dynamic>;
+                  final docId = docs[index].id;
+                  final type = data['type'] ?? '기타';
+                  final businessPath = data['businessPath'] ?? type;
+                  final reporterName = data['reporterName'] ?? data['userEmail'] ?? 'Unknown';
+                  final content = data['content'] ?? '';
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    color: isDarkMode ? Colors.grey[850] : Colors.white,
+                    child: InkWell(
+                      onTap: () => _showInfoSuggestionPopup(context, docId, data, isDarkMode),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('[제보] $businessPath', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDarkMode ? Colors.white : Colors.black)),
+                            const SizedBox(height: 4),
+                            Text('제보자: $reporterName', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                            const SizedBox(height: 4),
+                            Text(content, style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+
+        // 지역 선택 탭
+        Container(
+          color: isDarkMode ? Colors.black : const Color(0xFFF1F3F5),
+          height: 40,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: commonRegions.map((reg) {
+                final isSelected = _adminInfoRegion == reg;
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _adminInfoRegion = reg;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    alignment: Alignment.center,
+                    child: Text(
+                      reg,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? (isDarkMode ? Colors.blue[200] : Colors.blue[700])
+                            : (isDarkMode ? Colors.white54 : Colors.black54),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+
+        // 3차 서브 탭 (관광, 마사지 등)
+        Container(
+          color: isDarkMode ? Colors.grey[900] : const Color(0xFFE9ECEF),
+          height: 48,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: regionSubCategories.map((subCat) {
+                final isSelected = _adminInfoSubCategory == subCat['label'];
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _adminInfoSubCategory = subCat['label'];
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    child: Text(
+                      subCat['label'],
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? (isDarkMode ? Colors.blue[200] : Colors.blue[700])
+                            : (isDarkMode ? Colors.white54 : Colors.black54),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+
+        // 등록된 업체 리스트 헤더 및 추가 버튼
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: isDarkMode ? Colors.grey[850] : Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _adminInfoSubCategory == '전체' ? '$_adminInfoRegion 전체' : '$_adminInfoRegion $_adminInfoSubCategory',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDarkMode ? Colors.white : Colors.black87)
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => _showAddBusinessDialog(context, isDarkMode),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('추가'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                      minimumSize: const Size(0, 32),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  // 정렬 토글 버튼 (가나다)
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        if (_adminInfoSortMode == 'name_asc') {
+                          _adminInfoSortMode = 'name_desc';
+                        } else {
+                          _adminInfoSortMode = 'name_asc';
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _adminInfoSortMode.startsWith('name') ? Colors.blue.withOpacity(0.1) : Colors.transparent,
+                        border: Border.all(color: _adminInfoSortMode.startsWith('name') ? Colors.blue : Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          const Text('정렬(이름)', style: TextStyle(fontSize: 12)),
+                          Icon(_adminInfoSortMode == 'name_asc' ? Icons.arrow_upward : Icons.arrow_downward, size: 14),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // 거리순 토글
+                  InkWell(
+                    onTap: () async {
+                      if (_adminInfoSortMode.startsWith('dist')) {
+                        setState(() {
+                          _adminInfoSortMode = _adminInfoSortMode == 'dist_asc' ? 'dist_desc' : 'dist_asc';
+                        });
+                      } else {
+                        await _requestLocation();
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _adminInfoSortMode.startsWith('dist') ? Colors.blue.withOpacity(0.1) : Colors.transparent,
+                        border: Border.all(color: _adminInfoSortMode.startsWith('dist') ? Colors.blue : Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          const Text('거리', style: TextStyle(fontSize: 12)),
+                          if (_adminInfoSortMode.startsWith('dist'))
+                            Icon(_adminInfoSortMode == 'dist_asc' ? Icons.arrow_upward : Icons.arrow_downward, size: 14),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  // 영업중 필터
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _adminInfoOpenNowFilter,
+                        onChanged: (val) {
+                          setState(() {
+                            _adminInfoOpenNowFilter = val ?? false;
+                          });
+                        },
+                      ),
+                      const Text('영업중', style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // 등록된 업체 리스트
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _adminInfoSubCategory == '전체'
+                ? FirebaseFirestore.instance.collection('directory').where('region', isEqualTo: _adminInfoRegion).snapshots()
+                : FirebaseFirestore.instance.collection('directory').where('region', isEqualTo: _adminInfoRegion).where('subCategory', isEqualTo: _adminInfoSubCategory).snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) return const Center(child: Text('오류가 발생했습니다.'));
+              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+              final docs = snapshot.data?.docs ?? [];
+              if (docs.isEmpty) {
+                return Center(
+                  child: Text(
+                    "'$_adminInfoRegion' 지역의 '$_adminInfoSubCategory' 정보가 없습니다.",
+                    style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
+                  ),
+                );
+              }
+              
+              var businesses = docs.map((doc) => BusinessModel.fromFirestore(doc)).toList();
+              
+              // 영업중 필터
+              if (_adminInfoOpenNowFilter) {
+                businesses = businesses.where((b) => TimeUtils.isOpenNow(b.operatingHours)).toList();
+              }
+              
+              // 정렬
+              if (_adminInfoSortMode == 'name_asc') {
+                businesses.sort((a, b) => a.name.compareTo(b.name));
+              } else if (_adminInfoSortMode == 'name_desc') {
+                businesses.sort((a, b) => b.name.compareTo(a.name));
+              } else if (_adminInfoSortMode.startsWith('dist') && _currentPosition != null) {
+                businesses.sort((a, b) {
+                  final distA = _getDistance(a);
+                  final distB = _getDistance(b);
+                  if (_adminInfoSortMode == 'dist_asc') {
+                    return distA.compareTo(distB);
+                  } else {
+                    return distB.compareTo(distA);
+                  }
+                });
+              }
+              
+              if (businesses.isEmpty) {
+                return Center(
+                  child: Text(
+                    "조건에 맞는 업체가 없습니다.",
+                    style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: businesses.length,
+                itemBuilder: (context, index) {
+                  final business = businesses[index];
+                  return BusinessCard(
+                    business: business,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BusinessDetailScreen(business: business),
+                        ),
+                      );
+                    },
+                    onEdit: () => _showEditBusinessDialog(context, business),
+                    onDelete: () => _deleteBusiness(business),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAddBusinessDialog(BuildContext context, bool isDarkMode) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AddBusinessDialog(
+        region: _adminInfoRegion,
+        subCategory: _adminInfoSubCategory,
+      ),
+    );
+  }
+
+  void _showEditBusinessDialog(BuildContext context, BusinessModel business) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AddBusinessDialog(
+        region: business.region,
+        subCategory: business.subCategory,
+        existingBusiness: business,
+      ),
+    );
+  }
+
+  void _deleteBusiness(BusinessModel business) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('삭제 확인'),
+        content: Text('${business.name} 업체를 정말 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await FirebaseFirestore.instance.collection('directory').doc(business.id).delete();
+                if (mounted) UiUtils.showPopup(context, '삭제되었습니다.');
+              } catch (e) {
+                if (mounted) UiUtils.showPopup(context, '삭제 중 오류 발생: $e');
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('삭제', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDirectUpdateDialog(BuildContext context, bool isDarkMode) {
+    // A simple dialog for admin to update daily info directly
+    final typeCtrl = TextEditingController();
+    final contentCtrl = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('정보 직접 등록'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: typeCtrl, decoration: const InputDecoration(labelText: '정보 유형 (주유, 환율 등)')),
+            const SizedBox(height: 8),
+            TextField(controller: contentCtrl, maxLines: 3, decoration: const InputDecoration(labelText: '상세 내용')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+          ElevatedButton(
+            onPressed: () async {
+               await FirebaseFirestore.instance.collection('daily_info').add({
+                 'type': typeCtrl.text,
+                 'content': contentCtrl.text,
+                 'updatedAt': FieldValue.serverTimestamp(),
+               });
+               if (context.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildUserDashboard(bool isDarkMode) {
@@ -1741,7 +2259,7 @@ class _AdminScreenState extends State<AdminScreen> {
                           children: [
                             Text('$userName 님의 쪽지 목록', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
                             const SizedBox(width: 4),
-                            GestureDetector(
+                            InkWell(
                               onTap: () {
                                 setState(() {
                                   isDescending = !isDescending;
@@ -2025,7 +2543,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                     ),
                                     Positioned(
                                       right: 0, top: 0,
-                                      child: GestureDetector(
+                                      child: InkWell(
                                         onTap: () {
                                           setSt(() => existingImageUrls.removeAt(idx));
                                         },
@@ -2064,7 +2582,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                     ),
                                     Positioned(
                                       right: 0, top: 0,
-                                      child: GestureDetector(
+                                      child: InkWell(
                                         onTap: () {
                                           setSt(() => selectedImages.removeAt(idx));
                                         },
@@ -2158,4 +2676,158 @@ class _AdminScreenState extends State<AdminScreen> {
       }
     );
   }
+  Widget _buildDashboardTab(bool isDarkMode) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('전체 상황 모니터링', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          // 5 sections grid
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 1.5,
+            children: [
+              _buildDashboardCard('게시물', 'posts', Icons.article, isDarkMode),
+              _buildDashboardCard('사용자', 'users', Icons.people, isDarkMode),
+              _buildDashboardCard('어학원', 'directory', Icons.school, isDarkMode),
+              _buildDashboardCard('정보', 'info_suggestions', Icons.info, isDarkMode),
+              _buildDashboardCard('컨시어지', 'orders', Icons.room_service, isDarkMode),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardCard(String title, String collection, IconData icon, bool isDarkMode) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: collection == 'users'
+          ? FirebaseFirestore.instance.collection(collection).where('level', isEqualTo: '예비').snapshots()
+          : collection == 'info_suggestions'
+              ? FirebaseFirestore.instance.collection(collection).where('status', isEqualTo: 'pending').snapshots()
+              : collection == 'orders'
+                  ? FirebaseFirestore.instance.collection(collection).where('status', isEqualTo: 'pending').snapshots()
+                  : collection == 'directory'
+                      ? FirebaseFirestore.instance.collection(collection).where('category', isEqualTo: '어학원').snapshots()
+                      : FirebaseFirestore.instance.collection(collection).snapshots(),
+      builder: (context, snapshot) {
+        int count = 0;
+        String desc = '';
+        if (snapshot.hasData) {
+          count = snapshot.data!.docs.length;
+          if (collection == 'users') desc = '승인 대기 중';
+          else if (collection == 'info_suggestions') desc = '대기 중인 제보';
+          else if (collection == 'orders') desc = '접수 대기 중';
+          else if (collection == 'posts') desc = '전체 게시물 수';
+          else if (collection == 'directory') desc = '전체 어학원 수';
+        }
+        
+        return Card(
+          color: isDarkMode ? Colors.grey[850] : Colors.white,
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: InkWell(
+            onTap: () {
+              setState(() {
+                _selectedTab = title;
+              });
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 32, color: Colors.blue),
+                  const SizedBox(height: 8),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  else ...[
+                    Text('$count 건', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
+                    if (desc.isNotEmpty) Text(desc, style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white54 : Colors.black54)),
+                  ]
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showInfoSuggestionPopup(BuildContext context, String docId, Map<String, dynamic> data, bool isDarkMode) {
+    final userEmail = data['userEmail'] ?? 'Unknown';
+    final type = data['type'] ?? '기타';
+    final content = data['content'] ?? '';
+    final imageUrl = data['imageUrl'] ?? '';
+    String timeAgo = '';
+    if (data['createdAt'] != null) {
+      final dt = (data['createdAt'] as Timestamp).toDate();
+      timeAgo = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('[$type] 제보 상세내용', style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('제보자: $userEmail', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text('일시: $timeAgo', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 16),
+                const Text('상세 내용:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
+                  ),
+                  child: Text(content),
+                ),
+                if (imageUrl.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text('첨부 사진:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(imageUrl, fit: BoxFit.cover),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('닫기'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await FirebaseFirestore.instance.collection('info_suggestions').doc(docId).update({'status': 'approved'});
+                if (context.mounted) UiUtils.showPopup(context, '제보가 확인 완료 처리되었습니다.');
+              },
+              child: const Text('확인 완료 처리'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
+

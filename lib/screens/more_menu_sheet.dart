@@ -2,7 +2,6 @@ import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'community_screen.dart';
 import 'admin_screen.dart';
 import 'login_screen.dart';
 import 'profile_edit_screen.dart';
@@ -37,7 +36,8 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
   void _logout() async {
     await FirebaseAuth.instance.signOut();
     await GoogleSignIn(
-      clientId: '728466681157-hqbrfqmv0fu4s5jibin426sn027ah32v.apps.googleusercontent.com',
+      clientId:
+          '728466681157-hqbrfqmv0fu4s5jibin426sn027ah32v.apps.googleusercontent.com',
     ).signOut();
     if (mounted) {
       Navigator.pop(context); // 팝업 메뉴 닫기
@@ -61,14 +61,12 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
       width: 200,
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[900] : Colors.white, // Theme aware background
+        color: isDarkMode
+            ? Colors.grey[900]
+            : Colors.white, // Theme aware background
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black54,
-            blurRadius: 10,
-            spreadRadius: 2,
-          ),
+          BoxShadow(color: Colors.black54, blurRadius: 10, spreadRadius: 2),
         ],
       ),
       child: Column(
@@ -76,20 +74,45 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
         children: [
           if (isLoggedIn)
             ListTile(
-              leading: Icon(Icons.logout, color: isDarkMode ? Colors.white : Colors.black),
-              title: Text('로그아웃', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 13)),
+              leading: Icon(
+                Icons.logout,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+              title: Text(
+                '로그아웃',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                  fontSize: 13,
+                ),
+              ),
               onTap: _logout,
             )
           else
             ListTile(
-              leading: Icon(Icons.login, color: isDarkMode ? Colors.white : Colors.black),
-              title: Text('로그인', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+              leading: Icon(
+                Icons.login,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+              title: Text(
+                '로그인',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
               onTap: _navigateToLogin,
             ),
           Divider(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
           ListTile(
-            leading: Icon(Icons.person_outline, color: isDarkMode ? Colors.white70 : Colors.black87),
-            title: Text('회원정보 수정', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+            leading: Icon(
+              Icons.person_outline,
+              color: isDarkMode ? Colors.white70 : Colors.black87,
+            ),
+            title: Text(
+              '회원정보 수정',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
             onTap: () {
               Navigator.pop(context);
               if (isLoggedIn) {
@@ -98,7 +121,9 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
                 } else {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ProfileEditScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const ProfileEditScreen(),
+                    ),
                   );
                 }
               } else {
@@ -107,8 +132,14 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
             },
           ),
           ListTile(
-            leading: Icon(Icons.settings_outlined, color: isDarkMode ? Colors.white70 : Colors.black87),
-            title: Text('설정', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+            leading: Icon(
+              Icons.settings_outlined,
+              color: isDarkMode ? Colors.white70 : Colors.black87,
+            ),
+            title: Text(
+              '설정',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
             onTap: () {
               Navigator.pop(context);
               if (widget.onNavigate != null) {
@@ -116,7 +147,9 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
               } else {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
                 );
               }
             },
@@ -124,8 +157,17 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
           if (isAdmin) ...[
             Divider(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
             ListTile(
-              leading: Icon(Icons.admin_panel_settings, color: isDarkMode ? Colors.white70 : Colors.black87),
-              title: Text('관리', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+              leading: Icon(
+                Icons.admin_panel_settings,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
+              ),
+              title: Text(
+                '관리',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 if (widget.onNavigate != null) {
@@ -133,7 +175,9 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
                 } else {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const AdminScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const AdminScreen(),
+                    ),
                   );
                 }
               },

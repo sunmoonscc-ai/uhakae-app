@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -7,6 +9,7 @@ class PreferencesService {
   // 앱 시작 시 main()에서 한 번 호출하여 초기화합니다.
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    favoritesNotifier.value = favorites;
   }
 
   // --- 설정 키(Keys) ---
@@ -14,6 +17,9 @@ class PreferencesService {
   static const String _defaultRegionKey = 'defaultRegion';
   static const String _isAdminKey = 'isAdmin';
   static const String _userRegionKey = 'userRegion';
+  static const String _favoritesKey = 'favorites';
+  
+  static final ValueNotifier<List<Map<String, dynamic>>> favoritesNotifier = ValueNotifier([]);
   
   // 향후 다른 설정들의 키를 여기에 추가할 수 있습니다.
   // static const String _isNotificationsEnabledKey = 'isNotificationsEnabled';
@@ -66,14 +72,43 @@ class PreferencesService {
     await _prefs.setString(_userRegionKey, value);
   }
 
-  // --- 향후 추가될 설정 예시 ---
-  /*
-  static bool get isNotificationsEnabled {
-    return _prefs.getBool(_isNotificationsEnabledKey) ?? true;
+  // --- 즐겨찾기(Favorites) ---
+  static List<Map<String, dynamic>> get favorites {
+    final strList = _prefs.getStringList(_favoritesKey) ?? [];
+    return strList.map((str) => jsonDecode(str) as Map<String, dynamic>).toList();
   }
 
-  static Future<void> setNotificationsEnabled(bool value) async {
-    await _prefs.setBool(_isNotificationsEnabledKey, value);
+  static Future<void> addFavorite(Map<String, dynamic> item) async {
+    final list = favorites;
+    if (!list.any((e) => e['id'] == item['id'])) {
+      list.add(item);
+      final strList = list.map((e) => jsonEncode(e)).toList();
+      await _prefs.setStringList(_favoritesKey, strList);
+      favoritesNotifier.value = list;
+    }
   }
-  */
+
+  static Future<void> removeFavorite(String id) async {
+    final list = favorites;
+    list.removeWhere((e) => e['id'] == id);
+    final strList = list.map((e) => jsonEncode(e)).toList();
+    await _prefs.setStringList(_favoritesKey, strList);
+    favoritesNotifier.value = list;
+  }
+
+  static Future<void> updateFavoriteBusinessData(String id, Map<String, dynamic> businessData) async {
+    final list = favorites;
+    final index = list.indexWhere((e) => e['id'] == id);
+    if (index != -1) {
+      list[index]['businessData'] = businessData;
+      list[index]['title'] = businessData['name'] ?? list[index]['title'];
+      final strList = list.map((e) => jsonEncode(e)).toList();
+      await _prefs.setStringList(_favoritesKey, strList);
+      favoritesNotifier.value = list;
+    }
+  }
+
+  static bool isFavorite(String id) {
+    return favorites.any((e) => e['id'] == id);
+  }
 }

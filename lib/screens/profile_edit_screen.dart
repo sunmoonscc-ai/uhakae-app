@@ -18,6 +18,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final _phonePhController = TextEditingController();
   final _schoolController = TextEditingController();
   final _startDateController = TextEditingController();
+  final _endDateController = TextEditingController();
   
   String? _selectedSchool;
   final List<String> _schoolList = [
@@ -54,12 +55,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         setState(() {
           _phoneKrController.text = data['phone_kr'] ?? '';
           _phonePhController.text = data['phone_ph'] ?? '';
-          final fetchedSchool = data['school'] ?? '';
-          if (_schoolList.contains(fetchedSchool)) {
-            _selectedSchool = fetchedSchool;
+          
+          if (PreferencesService.isAdmin) {
+             _selectedSchool = null;
+             _schoolController.text = '';
+             _startDateController.text = '';
+             _endDateController.text = '';
+          } else {
+            final fetchedSchool = data['school'] ?? '';
+            if (_schoolList.contains(fetchedSchool)) {
+              _selectedSchool = fetchedSchool;
+            }
+            _schoolController.text = fetchedSchool;
+            _startDateController.text = data['start_date'] ?? '';
+            _endDateController.text = data['end_date'] ?? '';
           }
-          _schoolController.text = fetchedSchool;
-          _startDateController.text = data['start_date'] ?? '';
         });
       }
     } catch (e) {
@@ -74,6 +84,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _phonePhController.dispose();
     _schoolController.dispose();
     _startDateController.dispose();
+    _endDateController.dispose();
     super.dispose();
   }
 
@@ -101,6 +112,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           'phone_ph': _phonePhController.text,
           'school': _schoolController.text,
           'start_date': _startDateController.text,
+          'end_date': _endDateController.text,
         };
 
         if (result.docs.isNotEmpty) {
@@ -140,7 +152,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context) async {
+  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -152,12 +164,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         final year = picked.year.toString();
         final month = picked.month.toString().padLeft(2, '0');
         final day = picked.day.toString().padLeft(2, '0');
-        _startDateController.text = '$year-$month-$day';
+        controller.text = '$year-$month-$day';
       });
     }
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, bool isDarkMode, {String? hint, bool isDate = false, TextInputType? keyboardType}) {
+  Widget _buildTextField(String label, TextEditingController controller, bool isDarkMode, {String? hint, bool isDate = false, TextInputType? keyboardType, bool enabled = true}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -172,13 +184,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
-          readOnly: isDate,
+          readOnly: isDate || !enabled,
+          enabled: enabled,
           keyboardType: keyboardType,
-          onTap: isDate ? () => _selectDate(context) : null,
+          onTap: (isDate && enabled) ? () => _selectDate(context, controller) : null,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: isDarkMode ? Colors.grey[900] : Colors.white,
+            fillColor: enabled ? (isDarkMode ? Colors.grey[900] : Colors.white) : (isDarkMode ? Colors.grey[800] : Colors.grey[200]),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
@@ -198,7 +211,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             suffixIcon: isDate ? Icon(Icons.calendar_today, color: isDarkMode ? Colors.white54 : Colors.black54) : null,
           ),
           style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
+            color: enabled ? (isDarkMode ? Colors.white : Colors.black) : (isDarkMode ? Colors.white54 : Colors.black54),
           ),
           validator: label == '이름' ? (value) {
             if (value == null || value.isEmpty) {
@@ -213,6 +226,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   Widget _buildSchoolDropdown(bool isDarkMode) {
+    final bool isAdmin = PreferencesService.isAdmin;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -233,7 +247,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           ),
           decoration: InputDecoration(
             filled: true,
-            fillColor: isDarkMode ? Colors.grey[900] : Colors.white,
+            fillColor: !isAdmin ? (isDarkMode ? Colors.grey[900] : Colors.white) : (isDarkMode ? Colors.grey[800] : Colors.grey[200]),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
@@ -259,7 +273,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               child: Text(school),
             );
           }).toList(),
-          onChanged: (val) {
+          onChanged: isAdmin ? null : (val) {
             setState(() {
               _selectedSchool = val;
               if (val != null) _schoolController.text = val;
@@ -338,8 +352,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     _buildTextField('휴대전화 (한국)', _phoneKrController, isDarkMode, hint: '예: 010-1234-5678', keyboardType: TextInputType.phone),
                     _buildTextField('휴대전화 (필리핀)', _phonePhController, isDarkMode, hint: '예: 0917-123-4567', keyboardType: TextInputType.phone),
                     _buildSchoolDropdown(isDarkMode),
-                    _buildTextField('수업시작일', _startDateController, isDarkMode, hint: '시작 날짜를 선택하세요', isDate: true),
-                    
+                    Row(
+                      children: [
+                        Expanded(child: _buildTextField('수업시작일', _startDateController, isDarkMode, hint: '시작 날짜를 선택하세요', isDate: true, enabled: !PreferencesService.isAdmin)),
+                        const SizedBox(width: 16),
+                        Expanded(child: _buildTextField('수업종료(예정)일', _endDateController, isDarkMode, hint: '종료 날짜를 선택하세요', isDate: true, enabled: !PreferencesService.isAdmin)),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,

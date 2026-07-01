@@ -362,7 +362,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                                     ),
                                     Positioned(
                                       right: 0, top: 0,
-                                      child: GestureDetector(
+                                      child: InkWell(
                                         onTap: () {
                                           setSt(() => selectedImages.removeAt(idx));
                                         },

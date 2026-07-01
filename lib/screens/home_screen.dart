@@ -8,6 +8,10 @@ import '../services/weather_service.dart';
 import 'community_screen.dart';
 import 'post_detail_screen.dart';
 import 'info_screen.dart';
+import '../services/preferences_service.dart';
+import '../models/business_model.dart';
+import 'business_detail_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HomeScreen extends StatelessWidget {
   final Function(int)? onNavigateTab;
@@ -79,76 +83,23 @@ class HomeScreen extends StatelessWidget {
                   const _NoticeSection(),
                   const SizedBox(height: 24),
 
-                  // 현지 인프라 목록 (Firestore 실시간 오프라인 연동)
-                  Text(
-                    '추천 현지 장소',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
-                  ),
-                  const SizedBox(height: 12),
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('places').snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        return const Text('데이터를 불러오는 중 오류가 발생했습니다.');
-                      }
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      
-                      final docs = snapshot.data?.docs ?? [];
-                      if (docs.isEmpty) {
-                        return Container(
-                          padding: const EdgeInsets.all(24),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: isDarkMode ? Colors.grey[900] : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
-                          ),
-                          child: Text('아직 등록된 장소가 없습니다.\n(오프라인 상태일 수 있습니다)', style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
-                        );
-                      }
-
-                      return ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: docs.length,
-                        itemBuilder: (context, index) {
-                          final data = docs[index].data() as Map<String, dynamic>;
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            color: isDarkMode ? Colors.grey[900] : Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              side: BorderSide(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ListTile(
-                              title: Text(data['name'] ?? '이름 없음', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
-                              subtitle: Text(data['description'] ?? '', style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54)),
-                              trailing: Icon(Icons.arrow_forward_ios, size: 16, color: isDarkMode ? Colors.white54 : Colors.black54),
-                              onTap: () {
-                                // 상세 화면 이동 로직
-                              },
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                  const _FavoriteListSection(title: '즐겨찾기 장소', type: 'business'),
                 ],
               ),
             ),
           ),
           SliverFillRemaining(
             hasScrollBody: false,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: const [
-                  _ShortcutSection(),
-                ],
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    _FavoriteListSection(title: '즐겨찾기 메뉴', type: 'menu'),
+                  ],
+                ),
               ),
             ),
           ),
@@ -178,33 +129,17 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _ShortcutSection extends StatefulWidget {
-  const _ShortcutSection();
+class _FavoriteListSection extends StatefulWidget {
+  final String title;
+  final String type;
+  const _FavoriteListSection({required this.title, required this.type});
 
   @override
-  State<_ShortcutSection> createState() => _ShortcutSectionState();
+  State<_FavoriteListSection> createState() => _FavoriteListSectionState();
 }
 
-class _ShortcutSectionState extends State<_ShortcutSection> {
+class _FavoriteListSectionState extends State<_FavoriteListSection> {
   final ScrollController _scrollController = ScrollController();
-
-  final List<Map<String, dynamic>> allShortcuts = [
-    {'label': '뉴스', 'icon': Icons.article, 'color': Colors.blue[50], 'mainTab': '뉴스'},
-    {'label': '주요연락처', 'icon': Icons.contact_phone, 'color': Colors.green[50], 'mainTab': '주요연락처'},
-    {'label': '커뮤니티', 'icon': Icons.forum, 'color': Colors.orange[50], 'mainTab': '커뮤니티'},
-    {'label': '환율', 'icon': Icons.show_chart, 'color': Colors.purple[50], 'mainTab': '환율'},
-    {'label': '레저', 'icon': Icons.directions_run, 'color': const Color(0xFFE6F3FF), 'mainTab': '지역'},
-    {'label': '마사지', 'icon': Icons.spa, 'color': const Color(0xFFF3E5F5), 'mainTab': '지역'},
-    {'label': '병원', 'icon': Icons.local_hospital, 'color': const Color(0xFFFFEBEE), 'mainTab': '지역'},
-    {'label': '뷰티', 'icon': Icons.face, 'color': const Color(0xFFFCE4EC), 'mainTab': '지역'},
-    {'label': '세탁', 'icon': Icons.local_laundry_service, 'color': const Color(0xFFE0F7FA), 'mainTab': '지역'},
-    {'label': '쇼핑', 'icon': Icons.shopping_bag, 'color': const Color(0xFFFFF8E1), 'mainTab': '지역'},
-    {'label': '식당', 'icon': Icons.restaurant, 'color': const Color(0xFFFFF3E0), 'mainTab': '지역'},
-    {'label': '여행', 'icon': Icons.flight, 'color': const Color(0xFFE8EAF6), 'mainTab': '지역'},
-    {'label': '음식', 'icon': Icons.fastfood, 'color': const Color(0xFFFFE0B2), 'mainTab': '지역'},
-    {'label': '카페·바', 'icon': Icons.local_cafe, 'color': const Color(0xFFEFEBE9), 'mainTab': '지역'},
-    {'label': '환전', 'icon': Icons.currency_exchange, 'color': const Color(0xFFF1F8E9), 'mainTab': '지역'},
-  ];
 
   void _scrollLeft() {
     _scrollController.animateTo(
@@ -232,80 +167,200 @@ class _ShortcutSectionState extends State<_ShortcutSection> {
   Widget build(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
-    // HomeScreen에서 찾기 위해 onNavigateTab 호출 시 부모의 컨텍스트를 사용해야 할 수도 있으나
-    // 가장 쉬운 방법은 Navigation을 Context를 통해 처리하는 것입니다.
-    // 기존 로직을 최대한 유지합니다.
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 바로가기 텍스트 제거됨
-        const SizedBox(height: 12),
-        Row(
+    return ValueListenableBuilder<List<Map<String, dynamic>>>(
+      valueListenable: PreferencesService.favoritesNotifier,
+      builder: (context, allFavorites, child) {
+        final favorites = allFavorites.where((e) => e['type'] == widget.type).toList();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            InkWell(
-              onTap: _scrollLeft,
-              borderRadius: BorderRadius.circular(20),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
-                child: Icon(Icons.chevron_left, color: isDarkMode ? Colors.white54 : Colors.black54),
-              ),
+            Text(
+              widget.title,
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: allShortcuts.map((cat) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () {
-                          infoMainCategoryNotifier.value = cat['mainTab'];
-                          if (cat['mainTab'] == '지역') {
-                            regionSubCategoryNotifier.value = cat['label'];
-                          }
-                          
-                          final homeScreen = context.findAncestorWidgetOfExactType<HomeScreen>();
-                          if (homeScreen?.onNavigateTab != null) {
-                            homeScreen!.onNavigateTab!(2);
-                          }
-                        },
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: cat['color'],
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(cat['icon'], color: Colors.black87, size: 16),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(cat['label'], style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
+            const SizedBox(height: 12),
+            if (favorites.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24.0),
+                child: Center(
+                  child: Text(
+                    '(즐겨찾기 없음)',
+                    style: TextStyle(color: Colors.grey),
+                  ),
                 ),
+              )
+            else
+              Row(
+                children: [
+                  InkWell(
+                    onTap: _scrollLeft,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
+                      child: Icon(Icons.chevron_left, color: isDarkMode ? Colors.white54 : Colors.black54),
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      scrollDirection: Axis.horizontal,
+                      child: Builder(
+                        builder: (context) {
+                          if (widget.type == 'business') {
+                            // Calculate how many items fit in one row based on screen width
+                            int itemsPerRow = (MediaQuery.of(context).size.width - 64) ~/ 80;
+                            if (itemsPerRow < 1) itemsPerRow = 1;
+
+                            List<Widget> row1 = [];
+                            List<Widget> row2 = [];
+                            
+                            if (favorites.length <= itemsPerRow) {
+                              row1 = favorites.map((cat) => _buildFavoriteItem(cat, context)).toList();
+                            } else {
+                              for (int i = 0; i < favorites.length; i++) {
+                                if (i % 2 == 0) row1.add(_buildFavoriteItem(favorites[i], context));
+                                else row2.add(_buildFavoriteItem(favorites[i], context));
+                              }
+                            }
+
+                            return SizedBox(
+                              height: 228,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: row1,
+                                  ),
+                                  if (row2.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: row2,
+                                    ),
+                                  ]
+                                ],
+                              ),
+                            );
+                          } else {
+                            return Row(
+                              children: favorites.map((cat) => _buildFavoriteItem(cat, context)).toList(),
+                            );
+                          }
+                        }
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: _scrollRight,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
+                      child: Icon(Icons.chevron_right, color: isDarkMode ? Colors.white54 : Colors.black54),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            InkWell(
-              onTap: _scrollRight,
-              borderRadius: BorderRadius.circular(20),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
-                child: Icon(Icons.chevron_right, color: isDarkMode ? Colors.white54 : Colors.black54),
-              ),
-            ),
+            const SizedBox(height: 32),
           ],
-        ),
-        const SizedBox(height: 32),
-      ],
+        );
+      }
     );
+  }
+  Widget _buildFavoriteItem(Map<String, dynamic> cat, BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          if (cat['type'] == 'business') {
+            final business = BusinessModel.fromMap(cat['businessData'], cat['id']);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => BusinessDetailScreen(business: business)),
+            );
+          } else {
+            infoMainCategoryNotifier.value = cat['mainTab'] ?? '지역';
+            if (cat['mainTab'] == '지역' && cat['subCategory'] != null) {
+              regionSubCategoryNotifier.value = cat['subCategory'];
+            }
+            final homeScreen = context.findAncestorWidgetOfExactType<HomeScreen>();
+            if (homeScreen?.onNavigateTab != null) {
+              homeScreen!.onNavigateTab!(cat['tabIndex'] ?? 2);
+            }
+          }
+        },
+        child: SizedBox(
+          width: widget.type == 'business' ? 76 : 80,
+          height: widget.type == 'business' ? 110 : 100,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              if (widget.type == 'business') ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: (cat['businessData']?['thumbnailUrl'] != null && cat['businessData']['thumbnailUrl'].toString().isNotEmpty)
+                      ? CachedNetworkImage(
+                          imageUrl: cat['businessData']['thumbnailUrl'],
+                          width: 64,
+                          height: 64,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(width: 64, height: 64, color: Colors.grey[300]),
+                          errorWidget: (context, url, error) => Container(width: 64, height: 64, color: Colors.grey[300], child: const Icon(Icons.business, color: Colors.grey)),
+                        )
+                      : Container(
+                          width: 64,
+                          height: 64,
+                          color: Colors.white,
+                          child: Image.asset(
+                            _getPlaceholderImage(cat['businessData']?['subCategory'] ?? ''),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[300], child: const Icon(Icons.business, color: Colors.grey)),
+                          ),
+                        ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  cat['title'] ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ] else ...[
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: Color(cat['colorValue'] ?? 0xFFEEEEEE),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(IconData(cat['iconCodePoint'], fontFamily: cat['iconFontFamily'] ?? 'MaterialIcons'), color: Colors.black87, size: 28),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  cat['title'] ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ]
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getPlaceholderImage(String category) {
+    String assetPath = 'assets/images/logo.png'; // default
+    if (category.contains('쇼핑')) assetPath = 'assets/images/ph_shopping.png';
+    else if (category.contains('식당') || category.contains('음식')) assetPath = 'assets/images/ph_food.png';
+    else if (category.contains('카페') || category.contains('마사지') || category.contains('뷰티')) assetPath = 'assets/images/ph_cafe.png';
+    else if (category.contains('환전') || category.contains('은행')) assetPath = 'assets/images/ph_exchange.png';
+    else if (category.contains('관광') || category.contains('여행')) assetPath = 'assets/images/ph_tour.png';
+    return assetPath;
   }
 }
 

@@ -34,4 +34,29 @@ class FirebaseStorageService {
       return null;
     }
   }
+
+  Future<List<String>> uploadMultipleImages(List<XFile> files, String pathPrefix) async {
+    List<String> urls = [];
+    for (var file in files) {
+      try {
+        final bytes = await file.readAsBytes();
+        final String uuid = const Uuid().v4();
+        final String extension = file.name.contains('.') ? file.name.split('.').last : 'png';
+        final String fileName = '$uuid.$extension';
+        
+        final Reference ref = FirebaseStorage.instance.ref().child('$pathPrefix/$fileName');
+        final SettableMetadata metadata = SettableMetadata(
+          contentType: 'image/$extension',
+        );
+        
+        final UploadTask uploadTask = ref.putData(bytes, metadata);
+        final TaskSnapshot snapshot = await uploadTask;
+        final String downloadUrl = await snapshot.ref.getDownloadURL();
+        urls.add(downloadUrl);
+      } catch (e) {
+        print('Firebase Storage uploadMultipleImages error: $e');
+      }
+    }
+    return urls;
+  }
 }

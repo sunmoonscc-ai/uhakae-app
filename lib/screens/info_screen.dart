@@ -5,6 +5,11 @@ import 'exchange_screen.dart';
 import 'news_screen.dart';
 import 'contact_screen.dart';
 import '../services/preferences_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/business_model.dart';
+import '../widgets/business_card.dart';
+import 'business_detail_screen.dart';
+import 'submit_info_screen.dart';
 
 // 메인 카테고리 (가나다 순)
 final ValueNotifier<String> infoMainCategoryNotifier = ValueNotifier<String>('지역');
@@ -22,17 +27,15 @@ final ValueNotifier<String> commonRegionNotifier = ValueNotifier<String>('바기
 final List<String> commonRegions = ['바기오', '클락', '세부', '보홀'];
 
 // 지역 하위 카테고리 (3단)
-final ValueNotifier<String> regionSubCategoryNotifier = ValueNotifier<String>('레저');
+final ValueNotifier<String> regionSubCategoryNotifier = ValueNotifier<String>('전체');
 final List<Map<String, dynamic>> regionSubCategories = [
-  {'label': '레저', 'icon': Icons.directions_run, 'color': const Color(0xFFE6F3FF)},
+  {'label': '전체', 'icon': Icons.apps, 'color': const Color(0xFFF5F5F5)},
+  {'label': '관광', 'icon': Icons.tour, 'color': const Color(0xFFE8EAF6)},
   {'label': '마사지', 'icon': Icons.spa, 'color': const Color(0xFFF3E5F5)},
   {'label': '병원', 'icon': Icons.local_hospital, 'color': const Color(0xFFFFEBEE)},
   {'label': '뷰티', 'icon': Icons.face, 'color': const Color(0xFFFCE4EC)},
-  {'label': '세탁', 'icon': Icons.local_laundry_service, 'color': const Color(0xFFE0F7FA)},
   {'label': '쇼핑', 'icon': Icons.shopping_bag, 'color': const Color(0xFFFFF8E1)},
   {'label': '식당', 'icon': Icons.restaurant, 'color': const Color(0xFFFFF3E0)},
-  {'label': '여행', 'icon': Icons.flight, 'color': const Color(0xFFE8EAF6)},
-  {'label': '음식', 'icon': Icons.fastfood, 'color': const Color(0xFFFFE0B2)},
   {'label': '카페·바', 'icon': Icons.local_cafe, 'color': const Color(0xFFEFEBE9)},
   {'label': '환전', 'icon': Icons.currency_exchange, 'color': const Color(0xFFF1F8E9)},
 ];
@@ -125,6 +128,60 @@ class _InfoScreenState extends State<InfoScreen> {
             ),
           ],
         ),
+        actions: [
+          ValueListenableBuilder<String>(
+            valueListenable: infoMainCategoryNotifier,
+            builder: (context, mainTab, _) {
+              return ValueListenableBuilder<String>(
+                valueListenable: regionSubCategoryNotifier,
+                builder: (context, subTab, _) {
+                  return ValueListenableBuilder<List<Map<String, dynamic>>>(
+                    valueListenable: PreferencesService.favoritesNotifier,
+                    builder: (context, favorites, _) {
+                      final id = mainTab == '지역' ? 'menu_지역_$subTab' : 'menu_$mainTab';
+                      final isFav = PreferencesService.isFavorite(id);
+                      return IconButton(
+                        icon: Icon(
+                          isFav ? Icons.star : Icons.star_border,
+                          color: isFav ? Colors.amber : (isDarkMode ? Colors.white : Colors.black),
+                        ),
+                        onPressed: () {
+                          if (isFav) {
+                            PreferencesService.removeFavorite(id);
+                          } else {
+                            IconData icon = Icons.info;
+                            int colorValue = 0xFFE6F3FF;
+                            if (mainTab == '지역') {
+                              final match = regionSubCategories.firstWhere((e) => e['label'] == subTab, orElse: () => {'icon': Icons.tour, 'color': const Color(0xFFE8EAF6)});
+                              icon = match['icon'];
+                              colorValue = (match['color'] as Color).value;
+                            } else {
+                              if (mainTab == '뉴스') { icon = Icons.article; colorValue = Colors.blue[50]!.value; }
+                              else if (mainTab == '주요연락처') { icon = Icons.contact_phone; colorValue = Colors.green[50]!.value; }
+                              else if (mainTab == '커뮤니티') { icon = Icons.forum; colorValue = Colors.orange[50]!.value; }
+                              else if (mainTab == '환율') { icon = Icons.show_chart; colorValue = Colors.purple[50]!.value; }
+                            }
+                            PreferencesService.addFavorite({
+                              'id': id,
+                              'type': 'menu',
+                              'title': mainTab == '지역' ? subTab : mainTab,
+                              'iconCodePoint': icon.codePoint,
+                              'iconFontFamily': icon.fontFamily,
+                              'colorValue': colorValue,
+                              'mainTab': mainTab,
+                              'subCategory': subTab,
+                              'tabIndex': 2,
+                            });
+                          }
+                        },
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ],
       ),
       body: ValueListenableBuilder<String>(
         valueListenable: infoMainCategoryNotifier,
@@ -326,13 +383,53 @@ class _InfoScreenState extends State<InfoScreen> {
                             return ValueListenableBuilder<String>(
                               valueListenable: regionSubCategoryNotifier,
                               builder: (context, subCategory, _) {
-                                return Center(
-                                  child: Text(
-                                    "지역 > '$region' > '$subCategory' 상세 화면 준비 중입니다.",
-                                    style: TextStyle(
-                                      color: isDarkMode ? Colors.white70 : Colors.black54,
-                                    ),
-                                  ),
+                                return StreamBuilder<QuerySnapshot>(
+                                  stream: subCategory == '전체'
+                                      ? FirebaseFirestore.instance
+                                          .collection('directory')
+                                          .where('region', isEqualTo: region)
+                                          .snapshots()
+                                      : FirebaseFirestore.instance
+                                          .collection('directory')
+                                          .where('region', isEqualTo: region)
+                                          .where('subCategory', isEqualTo: subCategory)
+                                          .snapshots(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasError) {
+                                      return const Center(child: Text('오류가 발생했습니다.'));
+                                    }
+                                    if (snapshot.connectionState == ConnectionState.waiting) {
+                                      return const Center(child: CircularProgressIndicator());
+                                    }
+                                    final docs = snapshot.data?.docs ?? [];
+                                    if (docs.isEmpty) {
+                                      return Center(
+                                        child: Text(
+                                          "'$region' 지역의 '$subCategory' 정보가 없습니다.",
+                                          style: TextStyle(
+                                            color: isDarkMode ? Colors.white70 : Colors.black54,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return ListView.builder(
+                                      itemCount: docs.length,
+                                      itemBuilder: (context, index) {
+                                        final business = BusinessModel.fromFirestore(docs[index]);
+                                        return BusinessCard(
+                                          business: business,
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => BusinessDetailScreen(business: business),
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      },
+                                    );
+                                  },
                                 );
                               },
                             );

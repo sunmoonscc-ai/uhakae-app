@@ -10,21 +10,36 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black
+            : Colors.white,
         elevation: 0,
-        iconTheme: IconThemeData(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black,
+        ),
         title: Row(
           children: [
             Image.asset(
-              Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo(r).jpg' : 'assets/images/logo.png',
+              Theme.of(context).brightness == Brightness.dark
+                  ? 'assets/images/logo(r).jpg'
+                  : 'assets/images/logo.png',
               height: 32,
-              errorBuilder: (context, error, stackTrace) => Icon(Icons.settings, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+              errorBuilder: (context, error, stackTrace) => Icon(
+                Icons.settings,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
+              ),
             ),
             const SizedBox(width: 8),
             Text(
               '설정',
               style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -35,7 +50,7 @@ class SettingsScreen extends StatelessWidget {
         valueListenable: themeNotifier,
         builder: (context, ThemeMode currentMode, child) {
           final isDarkMode = currentMode == ThemeMode.dark;
-          
+
           return ListView(
             padding: const EdgeInsets.all(16.0),
             children: [
@@ -43,7 +58,9 @@ class SettingsScreen extends StatelessWidget {
                 color: isDarkMode ? Colors.grey[900] : Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                  side: BorderSide(
+                    color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                  ),
                 ),
                 child: SwitchListTile(
                   title: Text(
@@ -54,15 +71,19 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   subtitle: Text(
-                    isDarkMode ? '현재 다크 모드가 적용되어 있습니다.' : '현재 라이트 모드가 적용되어 있습니다.',
+                    isDarkMode
+                        ? '현재 다크 모드가 적용되어 있습니다.'
+                        : '현재 라이트 모드가 적용되어 있습니다.',
                     style: TextStyle(
                       color: isDarkMode ? Colors.white70 : Colors.black54,
                     ),
                   ),
                   value: isDarkMode,
-                  activeColor: Colors.tealAccent,
+                  activeThumbColor: Colors.tealAccent,
                   onChanged: (bool value) async {
-                    themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
+                    themeNotifier.value = value
+                        ? ThemeMode.dark
+                        : ThemeMode.light;
                     // 디바이스 로컬 스토리지에 변경된 설정값 저장
                     await PreferencesService.setDarkMode(value);
                   },
@@ -78,16 +99,24 @@ class SettingsScreen extends StatelessWidget {
                   color: isDarkMode ? Colors.grey[900] : Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                    side: BorderSide(
+                      color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                    ),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.location_on, color: isDarkMode ? Colors.white : Colors.black),
+                            Icon(
+                              Icons.location_on,
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
                             const SizedBox(width: 16),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,7 +126,9 @@ class SettingsScreen extends StatelessWidget {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
-                                    color: isDarkMode ? Colors.white : Colors.black,
+                                    color: isDarkMode
+                                        ? Colors.white
+                                        : Colors.black,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -105,7 +136,9 @@ class SettingsScreen extends StatelessWidget {
                                   '정보 탭의 기본 지역을 선택합니다.',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                                    color: isDarkMode
+                                        ? Colors.white70
+                                        : Colors.black54,
                                   ),
                                 ),
                               ],
@@ -116,25 +149,41 @@ class SettingsScreen extends StatelessWidget {
                           builder: (context, setState) {
                             return DropdownButton<String>(
                               value: PreferencesService.defaultRegion,
-                              dropdownColor: isDarkMode ? Colors.grey[800] : Colors.white,
+                              dropdownColor: isDarkMode
+                                  ? Colors.grey[800]
+                                  : Colors.white,
                               underline: const SizedBox(),
-                              icon: Icon(Icons.arrow_drop_down, color: isDarkMode ? Colors.white : Colors.black),
-                              items: ['전체', '바기오', '클락', '세부', '보홀'].map((String value) {
+                              icon: Icon(
+                                Icons.arrow_drop_down,
+                                color: isDarkMode ? Colors.white : Colors.black,
+                              ),
+                              items: ['전체', '바기오', '클락', '세부', '보홀'].map((
+                                String value,
+                              ) {
                                 return DropdownMenuItem<String>(
                                   value: value,
-                                  child: Text(value, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+                                  child: Text(
+                                    value,
+                                    style: TextStyle(
+                                      color: isDarkMode
+                                          ? Colors.white
+                                          : Colors.black,
+                                    ),
+                                  ),
                                 );
                               }).toList(),
                               onChanged: (String? newValue) async {
                                 if (newValue != null) {
-                                  await PreferencesService.setDefaultRegion(newValue);
+                                  await PreferencesService.setDefaultRegion(
+                                    newValue,
+                                  );
                                   // 지역 설정이 변경되면 정보 탭의 현재 선택 지역도 즉시 동기화
                                   commonRegionNotifier.value = newValue;
                                   setState(() {});
                                 }
                               },
                             );
-                          }
+                          },
                         ),
                       ],
                     ),
@@ -146,12 +195,27 @@ class SettingsScreen extends StatelessWidget {
                 color: isDarkMode ? Colors.grey[900] : Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                  side: BorderSide(
+                    color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                  ),
                 ),
                 child: ListTile(
-                  leading: Icon(Icons.info_outline, color: isDarkMode ? Colors.white : Colors.black),
-                  title: Text('앱 버전', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-                  trailing: Text('1.0.0', style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54)),
+                  leading: Icon(
+                    Icons.info_outline,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  title: Text(
+                    '앱 버전',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  trailing: Text(
+                    '1.0.0',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
                 ),
               ),
             ],

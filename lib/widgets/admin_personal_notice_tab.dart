@@ -361,7 +361,7 @@ class _AdminPersonalNoticeTabState extends State<AdminPersonalNoticeTab> {
                                                       child: Wrap(
                                                         spacing: 8,
                                                         runSpacing: 8,
-                                                        children: imageUrls.map((url) => GestureDetector(
+                                                        children: imageUrls.map((url) => InkWell(
                                                           onTap: () => _showImagePreviewDialog(context, url as String),
                                                           child: ClipRRect(
                                                             borderRadius: BorderRadius.circular(8),
