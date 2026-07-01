@@ -12,6 +12,9 @@ import 'screens/info_screen.dart';
 import 'services/preferences_service.dart';
 import 'widgets/global_upload_indicator.dart';
 import 'utils/time_utils.dart';
+import 'utils/ui_utils.dart';
+import 'package:provider/provider.dart';
+import 'services/cart_provider.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -34,7 +37,14 @@ void main() async {
       ? ThemeMode.dark
       : ThemeMode.light;
 
-  runApp(const StudyAbroadApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CartProvider()),
+      ],
+      child: const StudyAbroadApp(),
+    ),
+  );
 }
 
 class StudyAbroadApp extends StatelessWidget {
@@ -102,6 +112,8 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   Widget? _customScreen;
   StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<QuerySnapshot>? _adminOrderSubscription;
+  bool _isFirstOrderLoad = true;
 
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
     GlobalKey<NavigatorState>(),
@@ -138,6 +150,8 @@ class _MainScreenState extends State<MainScreen> {
             if (level == '정회원') {
               _checkPersonalNotices(userDoc.id);
               _checkDailyPoints(userDoc);
+            } else if (level == '관리자' || level == '최고관리자') {
+              _listenForNewOrders();
             }
           }
         } catch (e) {
@@ -147,6 +161,51 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void _listenForNewOrders() {
+    _adminOrderSubscription?.cancel();
+    _isFirstOrderLoad = true;
+    _adminOrderSubscription = FirebaseFirestore.instance
+        .collection('orders')
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .listen((snapshot) {
+      if (_isFirstOrderLoad) {
+        _isFirstOrderLoad = false;
+        if (snapshot.docs.isNotEmpty) {
+          _showPendingOrdersDialog(snapshot.docs.length);
+        }
+        return;
+      }
+      
+      int newlyAdded = 0;
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          newlyAdded++;
+        }
+      }
+      if (newlyAdded > 0) {
+        _showPendingOrdersDialog(snapshot.docs.length);
+      }
+    });
+  }
+
+  void _showPendingOrdersDialog(int count) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('새로운 주문 알림', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('현재 승인 대기 중인 주문/대여 요청이 $count건 있습니다.\n주문관리 메뉴에서 확인해 주세요.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _checkDailyPoints(QueryDocumentSnapshot userDoc) async {
     try {
       final data = userDoc.data() as Map<String, dynamic>;
@@ -154,10 +213,19 @@ class _MainScreenState extends State<MainScreen> {
       final todayDate = TimeUtils.getPhilippineDateString();
       
       if (lastPointDate != todayDate) {
-        // 포인트 10 추가하고 last_point_date 오늘로 변경
+        // 포인트 100 추가하고 last_point_date 오늘로 변경
         await FirebaseFirestore.instance.collection('users').doc(userDoc.id).update({
-          'points': FieldValue.increment(10),
+          'points': FieldValue.increment(100),
           'last_point_date': todayDate,
+        });
+        
+        // 내역 기록
+        await FirebaseFirestore.instance.collection('point_history').add({
+          'userId': userDoc.id,
+          'amount': 100,
+          'type': 'daily_login',
+          'description': '일일 접속 보상',
+          'createdAt': FieldValue.serverTimestamp(),
         });
       }
     } catch (e) {
@@ -319,6 +387,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _adminOrderSubscription?.cancel();
     super.dispose();
   }
 

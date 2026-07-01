@@ -1,7 +1,15 @@
-import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'package:study_abroad_app/models/product_model.dart';
+import 'package:study_abroad_app/screens/cart_screen.dart';
+import 'package:study_abroad_app/services/cart_provider.dart';
+import 'package:study_abroad_app/services/shop_service.dart';
+import 'package:study_abroad_app/widgets/product_card.dart';
+import 'package:study_abroad_app/screens/order_history_screen.dart';
 import '../services/preferences_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class ShopScreen extends StatefulWidget {
   final VoidCallback? onNavigateHome;
@@ -13,52 +21,20 @@ class ShopScreen extends StatefulWidget {
 
 class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final ShopService _shopService = ShopService();
+  late Future<List<Product>> _productsFuture;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _productsFuture = _shopService.fetchProducts();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
-  }
-
-  Future<void> _processMockPayment(BuildContext context, String itemId, String itemName, String type) async {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('주문 접수 (오프라인 큐잉)'),
-        content: Text("'$itemName' 항목에 대한 요청을 전송합니다.\n오프라인 상태라도 로컬에 안전하게 저장됩니다."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              
-              // Create an order document
-              await FirebaseFirestore.instance.collection('orders').add({
-                'user_id': 'user_dummy_123',
-                'item_id': itemId,
-                'item_name': itemName,
-                'type': type,
-                'status': 'pending',
-                'created_at': FieldValue.serverTimestamp(),
-              });
-
-              UiUtils.showPopup(context, "'$itemName' 요청이 성공적으로 큐에 저장되었습니다!");
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-            child: const Text('접수하기', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -89,13 +65,168 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                 fontWeight: FontWeight.bold,
               ),
             ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: StreamBuilder<User?>(
+                stream: FirebaseAuth.instance.authStateChanges(),
+                builder: (context, snapshot) {
+                  final user = snapshot.data;
+                  final String name = (user != null && user.displayName != null && user.displayName!.isNotEmpty) 
+                      ? user.displayName! 
+                      : (user != null ? '회원' : '게스트');
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: user != null && user.email != null
+                        ? FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).snapshots()
+                        : null,
+                    builder: (context, userSnapshot) {
+                      int points = 0;
+                      if (userSnapshot.hasData && userSnapshot.data!.docs.isNotEmpty) {
+                        final data = userSnapshot.data!.docs.first.data() as Map<String, dynamic>;
+                        points = (data['points'] as num?)?.toInt() ?? 0;
+                      }
+
+                      return StreamBuilder<QuerySnapshot>(
+                        stream: user != null
+                            ? FirebaseFirestore.instance
+                                .collection('orders')
+                                .where('userId', isEqualTo: user.uid)
+                                .where('status', isEqualTo: 'pending')
+                                .limit(1)
+                                .snapshots()
+                            : null,
+                        builder: (context, pendingSnapshot) {
+                          bool hasPending = pendingSnapshot.hasData && pendingSnapshot.data!.docs.isNotEmpty;
+
+                          Color pointColor = Colors.amber;
+                          if (hasPending) {
+                            pointColor = Colors.green;
+                          } else if (points <= 0) {
+                            pointColor = Colors.red;
+                          } else if (points <= 10000) {
+                            pointColor = Colors.orange;
+                          }
+
+                          return Row(
+                            children: [
+                              Icon(Icons.savings_outlined, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, size: 20),
+                              const SizedBox(width: 2),
+                              Text(
+                                NumberFormat('#,###').format(points),
+                                style: TextStyle(
+                                  color: pointColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
           ],
         ),
         actions: [
+          // 1. 장바구니 (Icon + Text + Badge)
+          InkWell(
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (context) => ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  child: SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.9,
+                    child: const CartScreen(),
+                  ),
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2.0),
+              child: Row(
+                children: [
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.all(4.0),
+                        child: Icon(Icons.shopping_bag_outlined, color: Colors.black),
+                      ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Consumer<CartProvider>(
+                          builder: (context, cart, child) {
+                            if (cart.itemCount == 0) return const SizedBox.shrink();
+                            return Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                '${cart.itemCount}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                    ],
+                  ),
+                  const SizedBox(width: 2),
+                  const Text('장바구니', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (context) => ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  child: SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.9,
+                    child: const OrderHistoryScreen(),
+                  ),
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2.0),
+              child: Row(
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(2.0),
+                    child: Icon(Icons.receipt_long, color: Colors.black),
+                  ),
+                  const SizedBox(width: 2),
+                  const Text('주문내역', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+            ),
+          ),
+          // 3. 즐겨찾기 (별)
           ValueListenableBuilder<List<Map<String, dynamic>>>(
             valueListenable: PreferencesService.favoritesNotifier,
             builder: (context, favorites, _) {
-              final id = 'menu_컨시어지';
+              final id = 'menu_쇼핑몰';
               final isFav = PreferencesService.isFavorite(id);
               final isDarkMode = Theme.of(context).brightness == Brightness.dark;
               return IconButton(
@@ -110,7 +241,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                     PreferencesService.addFavorite({
                       'id': id,
                       'type': 'menu',
-                      'title': '컨시어지',
+                      'title': '쇼핑몰/대여',
                       'iconCodePoint': Icons.shopping_cart.codePoint,
                       'iconFontFamily': Icons.shopping_cart.fontFamily,
                       'colorValue': 0xFFFFF9C4,
@@ -122,6 +253,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
               );
             },
           ),
+          const SizedBox(width: 2),
         ],
       ),
       body: Column(
@@ -148,12 +280,29 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
             ),
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildItemList('buy'),
-                _buildItemList('rent'),
-              ],
+            child: FutureBuilder<List<Product>>(
+              future: _productsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('에러 발생: ${snapshot.error}'));
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text('상품이 없습니다.'));
+                }
+
+                final allProducts = snapshot.data!;
+                final buyProducts = allProducts.where((p) => p.type == 'buy').toList();
+                final rentProducts = allProducts.where((p) => p.type == 'rent').toList();
+
+                return TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildProductList(buyProducts),
+                    _buildProductList(rentProducts),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -161,114 +310,14 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildItemList(String category) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('items')
-          .where('type', isEqualTo: category)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text('데이터를 불러오는 중 오류가 발생했습니다.'));
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty) {
-          return Center(
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              margin: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: const Text('등록된 아이템이 없습니다.\n(오프라인 상태일 수 있습니다)'),
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: docs.length,
-          itemBuilder: (context, index) {
-            final data = docs[index].data() as Map<String, dynamic>;
-            final itemId = docs[index].id;
-            final itemName = data['name'] ?? '상품명 없음';
-            return Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              color: Colors.white,
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                      image: data['imageUrl'] != null
-                          ? DecorationImage(
-                              image: NetworkImage(data['imageUrl']),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                    ),
-                    child: data['imageUrl'] == null
-                        ? const Icon(Icons.image, size: 48, color: Colors.grey)
-                        : null,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              itemName,
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              '${data['price'] ?? '가격 별도 문의'}',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0C6780),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          data['description'] ?? '',
-                          style: const TextStyle(color: Colors.grey),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: () => _processMockPayment(context, itemId, itemName, category),
-                          icon: const Icon(Icons.shopping_cart, color: Colors.white),
-                          label: Text(category == 'buy' ? '구매 요청하기' : '대여 요청하기', style: const TextStyle(color: Colors.white)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            minimumSize: const Size(double.infinity, 48),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
+  Widget _buildProductList(List<Product> products) {
+    if (products.isEmpty) {
+      return const Center(child: Text('등록된 상품이 없습니다.'));
+    }
+    return ListView.builder(
+      itemCount: products.length,
+      itemBuilder: (context, index) {
+        return ProductCard(product: products[index]);
       },
     );
   }

@@ -71,23 +71,13 @@ class HomeScreen extends StatelessWidget {
                   final String name = (user != null && user.displayName != null && user.displayName!.isNotEmpty) 
                       ? user.displayName! 
                       : (user != null ? '회원' : '게스트');
-                  return StreamBuilder<DocumentSnapshot>(
-                    stream: user != null 
-                        ? FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots()
-                        : null,
-                    builder: (context, userSnapshot) {
-                      final points = (userSnapshot.hasData && userSnapshot.data!.exists) 
-                          ? (userSnapshot.data!.data() as Map<String, dynamic>)['points'] ?? 0 
-                          : 0;
-                      return Text(
-                        '안녕하세요, $name님! (point $points)',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      );
-                    },
+                  return Text(
+                    '안녕하세요, $name님!',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   );
                 },
               ),

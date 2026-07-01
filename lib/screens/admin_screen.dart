@@ -14,6 +14,8 @@ import '../widgets/add_business_dialog.dart';
 import 'business_detail_screen.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'info_screen.dart'; // for regionSubCategories
+import '../widgets/admin_shop_management_tab.dart';
+import '../widgets/admin_product_management_tab.dart';
 import '../utils/time_utils.dart';
 import '../services/preferences_service.dart';
 
@@ -36,6 +38,8 @@ class _AdminScreenState extends State<AdminScreen> {
   String _adminInfoRegion = '바기오'; // 정보 관리 탭 지역
   String _adminInfoSubCategory = '전체'; // 정보 관리 탭 카테고리
   String _infoSuggestionStatus = 'pending'; // 'pending' or 'completed'
+  String _conciergeSubTab = '대시보드'; // 컨시어지 탭의 서브 탭
+  String _adminOrderFilter = 'pending'; // 주문 관리 탭 필터
   
   String _adminInfoSortMode = 'name_asc'; // 'name_asc', 'name_desc', 'dist_asc', 'dist_desc'
   bool _adminInfoOpenNowFilter = false;
@@ -187,6 +191,9 @@ class _AdminScreenState extends State<AdminScreen> {
     final nameCtrl = TextEditingController(text: data['name'] ?? '');
     final phoneKrCtrl = TextEditingController(text: data['phone_kr'] ?? '');
     final startDateCtrl = TextEditingController(text: data['start_date'] ?? '');
+    final pointsCtrl = TextEditingController(text: (data['points'] ?? 0).toString());
+    final pointsReasonCtrl = TextEditingController();
+    final int originalPoints = data['points'] ?? 0;
     String? selectedSchool = data['school'];
     
     String selectedLevel = data['level'] ?? '정회원';
@@ -262,6 +269,24 @@ class _AdminScreenState extends State<AdminScreen> {
                         validator: (val) => (val == null || val.trim().isEmpty) ? '이름을 입력해주세요.' : null,
                       ),
                       const SizedBox(height: 12),
+                      TextFormField(
+                        controller: pointsCtrl,
+                        decoration: const InputDecoration(labelText: '포인트'),
+                        keyboardType: TextInputType.number,
+                        validator: (val) => (val == null || val.trim().isEmpty) ? '포인트를 입력해주세요.' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: pointsReasonCtrl,
+                        decoration: const InputDecoration(labelText: '포인트 변경 사유 (변경 시 필수)', hintText: '예: 관리자 직권 수정'),
+                        validator: (val) {
+                          if (pointsCtrl.text.trim() != originalPoints.toString() && (val == null || val.trim().isEmpty)) {
+                            return '포인트 변경 시 사유를 반드시 입력해주세요.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         value: selectedLevel,
                         decoration: const InputDecoration(labelText: '회원등급'),
@@ -315,13 +340,28 @@ class _AdminScreenState extends State<AdminScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (formKey.currentState!.validate()) {
+                      final newPoints = int.tryParse(pointsCtrl.text.trim()) ?? originalPoints;
+                      
                       await FirebaseFirestore.instance.collection('users').doc(doc.id).update({
                         'name': nameCtrl.text.trim(),
                         'level': selectedLevel,
                         'phone_kr': phoneKrCtrl.text.trim(),
                         'school': selectedSchool,
                         'start_date': startDateCtrl.text.trim(),
+                        'points': newPoints,
                       });
+
+                      if (newPoints != originalPoints) {
+                        final diff = newPoints - originalPoints;
+                        await FirebaseFirestore.instance.collection('point_history').add({
+                          'userId': doc.id,
+                          'amount': diff,
+                          'type': 'admin_edit',
+                          'description': pointsReasonCtrl.text.trim(),
+                          'createdAt': FieldValue.serverTimestamp(),
+                        });
+                      }
+
                       if (context.mounted) Navigator.pop(context);
                       if (context.mounted) {
                         UiUtils.showPopup(context, '정보가 수정되었습니다.');
@@ -1032,108 +1072,35 @@ class _AdminScreenState extends State<AdminScreen> {
     }
 
     if (_selectedTab == '컨시어지') {
-      return StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('orders')
-                        .orderBy('created_at', descending: true)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        return const Center(child: Text('데이터를 불러오는 중 오류가 발생했습니다.'));
-                      }
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      final docs = snapshot.data?.docs ?? [];
-                      if (docs.isEmpty) {
-                        return const Center(child: Text('현재 접수된 주문이 없습니다.'));
-                      }
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: docs.length,
-                        itemBuilder: (context, index) {
-                          final data = docs[index].data() as Map<String, dynamic>;
-                          final orderId = docs[index].id;
-                          final currentStatus = data['status'] ?? 'pending';
-                          final itemName = data['item_name'] ?? '알 수 없는 상품';
-                          final type = data['type'] == 'buy' ? '구매 대행' : '대여';
-
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            color: Colors.white,
-                            elevation: 1,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        '[$type] $itemName',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: currentStatus == 'pending' 
-                                              ? Colors.orange.shade100 
-                                              : currentStatus == 'approved' 
-                                                  ? Colors.blue.shade100 
-                                                  : Colors.green.shade100,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          statusLabels[currentStatus] ?? currentStatus,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: currentStatus == 'pending' 
-                                              ? Colors.orange.shade800 
-                                              : currentStatus == 'approved' 
-                                                  ? Colors.blue.shade800 
-                                                  : Colors.green.shade800,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text('User ID: ${data['user_id']} | Order ID: $orderId', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      if (currentStatus == 'pending')
-                                        ElevatedButton(
-                                          onPressed: () => _updateOrderStatus(orderId, 'approved'),
-                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                                          child: const Text('승인(준비중) 처리', style: TextStyle(color: Colors.white)),
-                                        ),
-                                      if (currentStatus == 'approved')
-                                        ElevatedButton(
-                                          onPressed: () => _updateOrderStatus(orderId, 'completed'),
-                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                                          child: const Text('완료 처리', style: TextStyle(color: Colors.white)),
-                                        ),
-                                      if (currentStatus == 'completed' && data['type'] == 'rent')
-                                        ElevatedButton(
-                                          onPressed: () => _updateOrderStatus(orderId, 'returned'),
-                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
-                                          child: const Text('반납 완료', style: TextStyle(color: Colors.white)),
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
+      return Column(
+        children: [
+          // 서브 탭 바
+          Container(
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.black : const Color(0xFFF1F3F5),
+              border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
+            ),
+            child: Row(
+              children: [
+                _buildConciergeSubTabItem('대시보드', isDarkMode),
+                _buildConciergeSubTabItem('주문관리', isDarkMode),
+                _buildConciergeSubTabItem('판매관리', isDarkMode),
+                _buildConciergeSubTabItem('대여관리', isDarkMode),
+              ],
+            ),
+          ),
+          // 컨텐츠 영역
+          Expanded(
+            child: _conciergeSubTab == '대시보드'
+                ? _buildConciergeDashboard(isDarkMode)
+                : _conciergeSubTab == '주문관리'
+                    ? AdminShopManagementTab(initialFilter: _adminOrderFilter)
+                    : _conciergeSubTab == '판매관리'
+                        ? const AdminProductManagementTab(productType: 'buy')
+                        : const AdminProductManagementTab(productType: 'rent'),
+          ),
+        ],
+      );
     }
     if (_selectedTab == '정보') {
       return _buildInfoAdminTab(isDarkMode);
@@ -2920,6 +2887,224 @@ class _AdminScreenState extends State<AdminScreen> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildConciergeSubTabItem(String tabName, bool isDarkMode) {
+    final isSelected = _conciergeSubTab == tabName;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _conciergeSubTab = tabName;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isSelected ? Colors.blue : Colors.transparent,
+                width: 3,
+              ),
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            tabName,
+            style: TextStyle(
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConciergeDashboard(bool isDarkMode) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('컨시어지 요약', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          // 주문 요약 카드
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('orders').snapshots(),
+            builder: (context, orderSnapshot) {
+              int pending = 0;
+              int approved = 0;
+              int preparing = 0;
+              int shipping = 0;
+              int completed = 0;
+
+              Map<String, int> itemActiveCount = {}; // itemId -> count of items in progress
+
+              if (orderSnapshot.hasData) {
+                for (var doc in orderSnapshot.data!.docs) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final status = data['status'];
+                  
+                  if (status == 'pending') pending++;
+                  else if (status == 'approved') approved++;
+                  else if (status == 'preparing') preparing++;
+                  else if (status == 'shipping') shipping++;
+                  else if (status == 'completed' || status == 'delivered' || status == 'returned') completed++;
+
+                  if (['pending', 'approved', 'preparing', 'shipping'].contains(status)) {
+                    final items = data['items'] as List<dynamic>? ?? [];
+                    for (var item in items) {
+                      final itemId = item['id'];
+                      final quantity = item['quantity'] ?? 1;
+                      if (itemId != null) {
+                        itemActiveCount[itemId] = (itemActiveCount[itemId] ?? 0) + (quantity as int);
+                      }
+                    }
+                  }
+                }
+              }
+              
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('주문 처리 현황', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          const Divider(),
+                          Row(
+                            children: [
+                              Expanded(child: _buildStatItem('승인대기', pending.toString(), Colors.orange, onTap: () {
+                                setState(() { _conciergeSubTab = '주문관리'; _adminOrderFilter = 'pending'; });
+                              })),
+                              Expanded(child: _buildStatItem('결제진행', approved.toString(), Colors.blue, onTap: () {
+                                setState(() { _conciergeSubTab = '주문관리'; _adminOrderFilter = 'approved'; });
+                              })),
+                              Expanded(child: _buildStatItem('배송준비', preparing.toString(), Colors.amber, onTap: () {
+                                setState(() { _conciergeSubTab = '주문관리'; _adminOrderFilter = 'preparing'; });
+                              })),
+                              Expanded(child: _buildStatItem('배송중', shipping.toString(), Colors.purple, onTap: () {
+                                setState(() { _conciergeSubTab = '주문관리'; _adminOrderFilter = 'shipping'; });
+                              })),
+                              Expanded(child: _buildStatItem('완료', completed.toString(), Colors.green, onTap: () {
+                                setState(() { _conciergeSubTab = '주문관리'; _adminOrderFilter = 'completed'; });
+                              })),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 상품 현황 (상하 분리 리스트)
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('shop_items').snapshots(),
+                    builder: (context, productSnapshot) {
+                      if (!productSnapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      
+                      final allProducts = productSnapshot.data!.docs;
+                      final buyProducts = allProducts.where((d) => (d.data() as Map<String, dynamic>)['type'] == 'buy').toList();
+                      final rentProducts = allProducts.where((d) => (d.data() as Map<String, dynamic>)['type'] == 'rent').toList();
+                      
+                      return Column(
+                        children: [
+                          _buildProductListCard('판매 상품 현황', buyProducts, itemActiveCount, isDarkMode, onTapItem: () {
+                            setState(() { _conciergeSubTab = '판매관리'; });
+                          }),
+                          const SizedBox(height: 16),
+                          _buildProductListCard('대여 상품 현황', rentProducts, itemActiveCount, isDarkMode, onTapItem: () {
+                            setState(() { _conciergeSubTab = '대여관리'; });
+                          }),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductListCard(String title, List<QueryDocumentSnapshot> products, Map<String, int> activeCounts, bool isDarkMode, {VoidCallback? onTapItem}) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const Divider(),
+            if (products.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text('등록된 상품이 없습니다.', style: TextStyle(color: Colors.grey)),
+              )
+            else
+              ...products.map((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final name = data['name'] ?? '이름 없음';
+                final totalQuantity = data['totalQuantity'] ?? 0;
+                final inProgress = activeCounts[doc.id] ?? 0;
+                final available = totalQuantity > 0 ? (totalQuantity - inProgress) : 0;
+                
+                final isInfinite = totalQuantity == 0;
+                
+                return InkWell(
+                  onTap: onTapItem,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          flex: 4, 
+                          child: Text(name, style: const TextStyle(fontWeight: FontWeight.w500))
+                        ),
+                        Expanded(
+                          flex: 6, 
+                          child: Text(
+                            isInfinite 
+                              ? '진행중: $inProgress개 (무제한)'
+                              : '총 $totalQuantity개 | 진행중 $inProgress개 | 남음 $available개',
+                            style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87),
+                            textAlign: TextAlign.right,
+                          )
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, Color color, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          ],
+        ),
+      ),
     );
   }
 }
