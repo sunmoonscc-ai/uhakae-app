@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/business_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../utils/time_utils.dart';
 
 class BusinessCard extends StatelessWidget {
   final BusinessModel business;
@@ -70,6 +71,19 @@ class BusinessCard extends StatelessWidget {
                                 color: isDarkMode ? Colors.white : Colors.black,
                               ),
                               children: [
+                                if (business.operatingHours.isNotEmpty)
+                                  WidgetSpan(
+                                    alignment: PlaceholderAlignment.middle,
+                                    child: Container(
+                                      margin: const EdgeInsets.only(right: 6, bottom: 2),
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: TimeUtils.isOpenNow(business.operatingHours) ? Colors.green : Colors.red,
+                                      ),
+                                    ),
+                                  ),
                                 TextSpan(
                                   text: business.name,
                                   style: const TextStyle(fontWeight: FontWeight.bold),

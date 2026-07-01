@@ -9,6 +9,7 @@ import 'image_viewer_screen.dart';
 import '../utils/telecom_utils.dart';
 import '../services/preferences_service.dart';
 import '../utils/ui_utils.dart';
+import '../utils/time_utils.dart';
 
 class BusinessDetailScreen extends StatefulWidget {
   final BusinessModel business;
@@ -338,6 +339,15 @@ class _BusinessDetailScreenContent extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              if (business.operatingHours.isNotEmpty)
+                TextSpan(
+                  text: TimeUtils.isOpenNow(business.operatingHours) ? ' (OPEN)' : ' (CLOSE)',
+                  style: TextStyle(
+                    color: TimeUtils.isOpenNow(business.operatingHours) ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
             ],
           ),
         ),
