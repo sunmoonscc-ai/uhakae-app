@@ -177,7 +177,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
         title: Row(
           children: [
             Image.asset(
-              isDarkMode ? 'assets/images/logo(r).jpg' : 'assets/images/logo.png',
+              isDarkMode ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
               height: 28,
               errorBuilder: (context, error, stackTrace) => Icon(Icons.forum, color: isDarkMode ? Colors.white : Colors.black),
             ),

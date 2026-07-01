@@ -10,8 +10,10 @@ import 'screens/more_menu_sheet.dart';
 import 'screens/shop_screen.dart';
 import 'screens/info_screen.dart';
 import 'services/preferences_service.dart';
+import 'widgets/global_upload_indicator.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +45,7 @@ class StudyAbroadApp extends StatelessWidget {
       valueListenable: themeNotifier,
       builder: (_, ThemeMode currentMode, _) {
         return MaterialApp(
+          navigatorKey: rootNavigatorKey,
           title: '유학원 컴패니언',
           debugShowCheckedModeBanner: false,
           themeMode: currentMode,

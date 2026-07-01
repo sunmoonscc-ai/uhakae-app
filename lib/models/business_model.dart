@@ -90,4 +90,27 @@ class BusinessModel {
       'relatedLinks': relatedLinks,
     };
   }
+
+  String get city {
+    final lowerAddr = address.toLowerCase();
+    if (lowerAddr.contains('lapu-lapu') || lowerAddr.contains('lapu lapu')) return 'Lapu-Lapu';
+    if (lowerAddr.contains('mandaue')) return 'Mandaue';
+    if (lowerAddr.contains('cebu city')) return 'Cebu City';
+    if (lowerAddr.contains('talisay')) return 'Talisay';
+    if (lowerAddr.contains('consolacion')) return 'Consolacion';
+    if (lowerAddr.contains('makati')) return 'Makati';
+    if (lowerAddr.contains('bgc') || lowerAddr.contains('taguig')) return 'BGC';
+    if (lowerAddr.contains('pasay')) return 'Pasay';
+    if (lowerAddr.contains('manila')) return 'Manila';
+    if (lowerAddr.contains('clark') || lowerAddr.contains('angeles')) return 'Clark/Angeles';
+    if (lowerAddr.contains('baguio')) return 'Baguio';
+    if (lowerAddr.contains('bohol') || lowerAddr.contains('panglao')) return 'Bohol/Panglao';
+    
+    final parts = address.split(',');
+    if (parts.length >= 2) {
+      final possibleCity = parts[parts.length - 2].trim();
+      if (possibleCity.length > 3) return possibleCity;
+    }
+    return region;
+  }
 }

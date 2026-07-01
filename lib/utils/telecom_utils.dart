@@ -7,8 +7,9 @@ class TelecomUtils {
 
   static const List<String> _smartPrefixes = [
     '0908', '0918', '0919', '0920', '0921', '0922', '0923', '0924', '0925', '0928',
-    '0929', '0932', '0933', '0934', '0939', '0942', '0943', '0947', '0949', '0961',
-    '0973', '0974', '0998', '0999', '0813'
+    '0929', '0932', '0933', '0934', '0938', '0939', '0942', '0943', '0946', '0947', 
+    '0948', '0949', '0950', '0951', '0961', '0963', '0968', '0969', '0970', '0973', 
+    '0974', '0981', '0989', '0998', '0999', '0813'
   ];
 
   static const List<String> _ditoPrefixes = [
@@ -19,6 +20,14 @@ class TelecomUtils {
     // Remove all non-numeric characters
     final cleanNumber = number.replaceAll(RegExp(r'[^0-9]'), '');
     
+    // Check for landlines first (Cebu: 032, Baguio: 074, Clark/Pampanga: 045, Bohol: 038)
+    if (cleanNumber.startsWith('032') || 
+        cleanNumber.startsWith('074') || 
+        cleanNumber.startsWith('045') || 
+        cleanNumber.startsWith('038')) {
+      return 'Landline';
+    }
+
     // Check if it's long enough and starts with 09 or 639
     String prefix = '';
     if (cleanNumber.length >= 4 && cleanNumber.startsWith('09')) {

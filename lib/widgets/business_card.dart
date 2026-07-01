@@ -7,6 +7,7 @@ class BusinessCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final double? distance;
 
   const BusinessCard({
     super.key,
@@ -14,6 +15,7 @@ class BusinessCard extends StatelessWidget {
     required this.onTap,
     this.onEdit,
     this.onDelete,
+    this.distance,
   });
 
   @override
@@ -59,14 +61,31 @@ class BusinessCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
-                          child: Text(
-                            business.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          child: RichText(
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            text: TextSpan(
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: isDarkMode ? Colors.white : Colors.black,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: business.name,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                TextSpan(
+                                  text: distance != null 
+                                      ? ' / ${business.city}, ${(distance! / 1000).toStringAsFixed(1)}km'
+                                      : ' / ${business.city}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.normal,
+                                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         if (onEdit != null || onDelete != null)
@@ -100,7 +119,7 @@ class BusinessCard extends StatelessWidget {
                         color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                         fontSize: 14,
                       ),
-                      maxLines: 4,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -116,10 +135,13 @@ class BusinessCard extends StatelessWidget {
   Widget _buildPlaceholder(String category) {
     String assetPath = 'assets/images/logo.png'; // default
     if (category.contains('쇼핑')) assetPath = 'assets/images/ph_shopping.png';
-    else if (category.contains('식당') || category.contains('음식')) assetPath = 'assets/images/ph_food.png';
-    else if (category.contains('카페') || category.contains('마사지') || category.contains('뷰티')) assetPath = 'assets/images/ph_cafe.png';
+    else if (category.contains('식당') || category.contains('음식')) assetPath = 'assets/images/ph_restaurant.png';
+    else if (category.contains('카페')) assetPath = 'assets/images/ph_cafebar.png';
+    else if (category.contains('마사지')) assetPath = 'assets/images/ph_massage.png';
+    else if (category.contains('뷰티')) assetPath = 'assets/images/ph_beauty.png';
     else if (category.contains('환전') || category.contains('은행')) assetPath = 'assets/images/ph_exchange.png';
-    else if (category.contains('관광') || category.contains('여행')) assetPath = 'assets/images/ph_tour.png';
+    else if (category.contains('관광') || category.contains('여행')) assetPath = 'assets/images/ph_travel.png';
+    else if (category.contains('병원')) assetPath = 'assets/images/ph_hospital.png';
     
     return Container(
       width: 80,

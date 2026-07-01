@@ -12,6 +12,7 @@ import '../services/preferences_service.dart';
 import '../models/business_model.dart';
 import 'business_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'admin_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final Function(int)? onNavigateTab;
@@ -33,7 +34,7 @@ class HomeScreen extends StatelessWidget {
               child: GestureDetector(
                 onTap: () => onNavigateTab?.call(0),
                 child: Image.asset(
-                  isDarkMode ? 'assets/images/logo(r).jpg' : 'assets/images/logo.png',
+                  isDarkMode ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
                   height: 32,
                   errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
                 ),
@@ -280,13 +281,20 @@ class _FavoriteListSectionState extends State<_FavoriteListSection> {
               MaterialPageRoute(builder: (context) => BusinessDetailScreen(business: business)),
             );
           } else {
-            infoMainCategoryNotifier.value = cat['mainTab'] ?? '지역';
-            if (cat['mainTab'] == '지역' && cat['subCategory'] != null) {
-              regionSubCategoryNotifier.value = cat['subCategory'];
-            }
-            final homeScreen = context.findAncestorWidgetOfExactType<HomeScreen>();
-            if (homeScreen?.onNavigateTab != null) {
-              homeScreen!.onNavigateTab!(cat['tabIndex'] ?? 2);
+            if (cat['isAdminMenu'] == true) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AdminScreen(initialTab: cat['adminTab'])),
+              );
+            } else {
+              infoMainCategoryNotifier.value = cat['mainTab'] ?? '지역';
+              if (cat['mainTab'] == '지역' && cat['subCategory'] != null) {
+                regionSubCategoryNotifier.value = cat['subCategory'];
+              }
+              final homeScreen = context.findAncestorWidgetOfExactType<HomeScreen>();
+              if (homeScreen?.onNavigateTab != null) {
+                homeScreen!.onNavigateTab!(cat['tabIndex'] ?? 2);
+              }
             }
           }
         },
@@ -356,10 +364,13 @@ class _FavoriteListSectionState extends State<_FavoriteListSection> {
   String _getPlaceholderImage(String category) {
     String assetPath = 'assets/images/logo.png'; // default
     if (category.contains('쇼핑')) assetPath = 'assets/images/ph_shopping.png';
-    else if (category.contains('식당') || category.contains('음식')) assetPath = 'assets/images/ph_food.png';
-    else if (category.contains('카페') || category.contains('마사지') || category.contains('뷰티')) assetPath = 'assets/images/ph_cafe.png';
+    else if (category.contains('식당') || category.contains('음식')) assetPath = 'assets/images/ph_restaurant.png';
+    else if (category.contains('카페')) assetPath = 'assets/images/ph_cafebar.png';
+    else if (category.contains('마사지')) assetPath = 'assets/images/ph_massage.png';
+    else if (category.contains('뷰티')) assetPath = 'assets/images/ph_beauty.png';
     else if (category.contains('환전') || category.contains('은행')) assetPath = 'assets/images/ph_exchange.png';
-    else if (category.contains('관광') || category.contains('여행')) assetPath = 'assets/images/ph_tour.png';
+    else if (category.contains('관광') || category.contains('여행')) assetPath = 'assets/images/ph_travel.png';
+    else if (category.contains('병원')) assetPath = 'assets/images/ph_hospital.png';
     return assetPath;
   }
 }

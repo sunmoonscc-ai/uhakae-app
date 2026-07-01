@@ -10,6 +10,8 @@ import '../utils/ui_utils.dart';
 import '../utils/telecom_utils.dart';
 import '../models/business_model.dart';
 import '../screens/info_screen.dart';
+import '../main.dart';
+import 'global_upload_indicator.dart';
 
 class ImageItem {
   final String? url;
@@ -50,6 +52,7 @@ class _AddBusinessDialogState extends State<AddBusinessDialog> {
 
   late String _selectedRegion;
   late String _selectedSubCategory;
+  bool _canPop = false;
 
   final ValueNotifier<String> _telecomCarrier = ValueNotifier<String>('');
 
@@ -66,6 +69,9 @@ class _AddBusinessDialogState extends State<AddBusinessDialog> {
     super.initState();
     _selectedRegion = widget.existingBusiness?.region ?? widget.region;
     _selectedSubCategory = widget.existingBusiness?.subCategory ?? widget.subCategory;
+    if (_selectedSubCategory == '전체') {
+      _selectedSubCategory = '관광';
+    }
     
     _contactCtrl.addListener(() {
       final carrier = TelecomUtils.getPhilippineTelecom(_contactCtrl.text);
@@ -251,91 +257,144 @@ class _AddBusinessDialogState extends State<AddBusinessDialog> {
       return;
     }
 
-    setState(() {
-      _isUploading = true;
-    });
+    // Capture variables locally
+    final bool isEdit = widget.existingBusiness != null;
+    final String? existingId = widget.existingBusiness?.id;
+    final String region = widget.region;
+    final String subCategory = widget.subCategory;
+    final String selectedRegion = _selectedRegion;
+    final String selectedSubCategory = _selectedSubCategory;
+    final String name = _nameCtrl.text.trim();
+    final String desc = _descCtrl.text.trim();
+    final String addr1 = _addr1Ctrl.text.trim();
+    final String addr2 = _addr2Ctrl.text.trim();
+    final String addr3 = _addr3Ctrl.text.trim();
+    final String contact = _contactCtrl.text.trim();
+    final String sns = _snsCtrl.text.trim();
+    final String hours = _hoursCtrl.text.trim();
+    final String providerDesc = _providerDescCtrl.text.trim();
+    
+    // Copy the lists
+    final List<ImageItem> relatedImages = List.from(_relatedImages);
+    final List<ImageItem> priceImages = List.from(_priceImages);
+    final List<ImageItem> providerImages = List.from(_providerImages);
+    final List<String> relatedLinks = _relatedLinksCtrls
+        .map((c) => c.text.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
 
-    try {
-      // Upload related images
-      List<String> relatedUrls = await _uploadAndMergeImages(
-        _relatedImages,
-        'directory/${widget.region}/${widget.subCategory}/related',
-      );
+    // Pop the dialog immediately
+    setState(() { _canPop = true; });
+    Navigator.pop(context);
 
-      // Upload price images
-      List<String> priceUrls = await _uploadAndMergeImages(
-        _priceImages,
-        'directory/${widget.region}/${widget.subCategory}/price',
-      );
-
-      // Upload provider images
-      List<String> providerUrls = await _uploadAndMergeImages(
-        _providerImages,
-        'directory/${widget.region}/${widget.subCategory}/provider',
-      );
-
-      // Thumbnail defaults to first related image, or first provider image if related is empty
-      String thumbnailUrl = relatedUrls.isNotEmpty 
-          ? relatedUrls.first 
-          : (providerUrls.isNotEmpty ? providerUrls.first : '');
-
-      List<String> relatedLinks = _relatedLinksCtrls
-          .map((c) => c.text.trim())
-          .where((t) => t.isNotEmpty)
-          .toList();
-
-      final Map<String, dynamic> data = {
-        'category': '지역',
-        'region': _selectedRegion,
-        'subCategory': _selectedSubCategory,
-        'name': _nameCtrl.text.trim(),
-        'description': _descCtrl.text.trim(),
-        'address': _addr1Ctrl.text.trim(),
-        'address2': _addr2Ctrl.text.trim(),
-        'address3': _addr3Ctrl.text.trim(),
-        'contact': _contactCtrl.text.trim(),
-        'sns': _snsCtrl.text.trim(),
-        'operatingHours': _hoursCtrl.text.trim(),
-        'thumbnailUrl': thumbnailUrl,
-        'relatedImages': relatedUrls,
-        'priceImages': priceUrls,
-        'providerDescription': _providerDescCtrl.text.trim(),
-        'providerImages': providerUrls,
-        'relatedLinks': relatedLinks,
-      };
-
-      if (widget.existingBusiness != null) {
-        await FirebaseFirestore.instance.collection('directory').doc(widget.existingBusiness!.id).update(data);
-        if (mounted) {
-          Navigator.pop(context);
-          UiUtils.showPopup(context, '업체가 성공적으로 수정되었습니다.');
-        }
-      } else {
-        data['createdAt'] = FieldValue.serverTimestamp();
-        await FirebaseFirestore.instance.collection('directory').add(data);
-        if (mounted) {
-          Navigator.pop(context);
-          UiUtils.showPopup(context, '업체가 성공적으로 추가되었습니다.');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        UiUtils.showPopup(context, '저장 중 오류가 발생했습니다: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
-      }
+    final BuildContext? rootContext = rootNavigatorKey.currentContext;
+    if (rootContext != null) {
+      GlobalUploadManager.init(rootContext);
     }
+
+    // Start background task
+    Future.microtask(() async {
+      globalUploadingNotifier.value = [...globalUploadingNotifier.value, name];
+      try {
+        List<String> relatedUrls = await _uploadAndMergeImages(
+          relatedImages,
+          'directory/$region/$subCategory/related',
+        );
+
+        List<String> priceUrls = await _uploadAndMergeImages(
+          priceImages,
+          'directory/$region/$subCategory/price',
+        );
+
+        List<String> providerUrls = await _uploadAndMergeImages(
+          providerImages,
+          'directory/$region/$subCategory/provider',
+        );
+
+        String thumbnailUrl = relatedUrls.isNotEmpty 
+            ? relatedUrls.first 
+            : (providerUrls.isNotEmpty ? providerUrls.first : '');
+
+        final Map<String, dynamic> data = {
+          'category': '지역',
+          'region': selectedRegion,
+          'subCategory': selectedSubCategory,
+          'name': name,
+          'description': desc,
+          'address': addr1,
+          'address2': addr2,
+          'address3': addr3,
+          'contact': contact,
+          'sns': sns,
+          'operatingHours': hours,
+          'thumbnailUrl': thumbnailUrl,
+          'relatedImages': relatedUrls,
+          'priceImages': priceUrls,
+          'providerDescription': providerDesc,
+          'providerImages': providerUrls,
+          'relatedLinks': relatedLinks,
+        };
+
+        if (isEdit && existingId != null) {
+          await FirebaseFirestore.instance.collection('directory').doc(existingId).update(data);
+          if (rootContext != null) {
+            UiUtils.showPopup(rootContext, '[$name] 정보 수정이 완료되었습니다.');
+          }
+        } else {
+          data['createdAt'] = FieldValue.serverTimestamp();
+          await FirebaseFirestore.instance.collection('directory').add(data);
+          if (rootContext != null) {
+            UiUtils.showPopup(rootContext, '[$name] 정보 추가가 완료되었습니다.');
+          }
+        }
+      } catch (e) {
+        if (rootContext != null) {
+          UiUtils.showPopup(rootContext, '[$name] 저장 중 오류 발생: $e');
+        }
+      } finally {
+        final currentList = List<String>.from(globalUploadingNotifier.value);
+        currentList.remove(name);
+        globalUploadingNotifier.value = currentList;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.existingBusiness != null;
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return PopScope(
+      canPop: _canPop,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        final bool? shouldPop = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('닫기'),
+            content: const Text('입력 중인 내용이 저장되지 않았습니다. 정말 닫으시겠습니까?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('취소', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('확인', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+        if (shouldPop == true) {
+          setState(() {
+            _canPop = true;
+          });
+          if (context.mounted) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 600,
@@ -368,7 +427,6 @@ class _AddBusinessDialogState extends State<AddBusinessDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (isEdit) ...[
                       Row(
                         children: [
                           Expanded(
@@ -384,17 +442,19 @@ class _AddBusinessDialogState extends State<AddBusinessDialog> {
                             child: DropdownButtonFormField<String>(
                               value: _selectedSubCategory,
                               decoration: const InputDecoration(labelText: '분류', border: OutlineInputBorder()),
-                              items: regionSubCategories.map((c) => DropdownMenuItem(value: c['label'].toString(), child: Text(c['label'].toString()))).toList(),
+                              items: regionSubCategories
+                                  .where((c) => c['label'] != '전체')
+                                  .map((c) => DropdownMenuItem(value: c['label'].toString(), child: Text(c['label'].toString())))
+                                  .toList(),
                               onChanged: (v) => setState(() => _selectedSubCategory = v!),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                    ],
                     TextField(
                       controller: _nameCtrl,
-                      decoration: const InputDecoration(labelText: '업체명', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(labelText: '이름', border: OutlineInputBorder()),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -425,23 +485,10 @@ class _AddBusinessDialogState extends State<AddBusinessDialog> {
                       controller: _contactCtrl,
                       decoration: const InputDecoration(labelText: '전화번호', border: OutlineInputBorder()),
                     ),
-                    ValueListenableBuilder<String>(
-                      valueListenable: _telecomCarrier,
-                      builder: (context, carrier, child) {
-                        if (carrier.isEmpty) return const SizedBox.shrink();
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 4, left: 4),
-                          child: Text(
-                            '인식된 통신사: $carrier',
-                            style: TextStyle(color: Colors.blue.shade700, fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        );
-                      },
-                    ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _snsCtrl,
-                      decoration: const InputDecoration(labelText: 'SNS (k:카카오, l:라인, w:위챗, f:페이스북, i:인스타, t:텔레그램)', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(labelText: 'SNS (k/ 카카오, l/ 라인, w/ 위챗, f/ 페이스북, i/ 인스타, t/ 텔레그램)', border: OutlineInputBorder()),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -491,7 +538,7 @@ class _AddBusinessDialogState extends State<AddBusinessDialog> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildRelatedLinksSection() {

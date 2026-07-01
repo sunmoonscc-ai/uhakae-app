@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/ui_utils.dart';
 
 class ImageViewerScreen extends StatefulWidget {
   final List<String> imageUrls;
@@ -87,7 +88,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                         });
 
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('대표사진으로 지정되었습니다. 변경 사항을 보려면 앱을 새로고침 해주세요.')));
+                      UiUtils.showPopup(context, '대표사진으로 지정되었습니다. 변경 사항을 보려면 앱을 새로고침 해주세요.');
                     }
                   } catch (e) {
                     debugPrint('Error updating representative image: $e');

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'community_screen.dart';
 import 'weather_screen.dart';
 import 'exchange_screen.dart';
@@ -10,6 +11,9 @@ import '../models/business_model.dart';
 import '../widgets/business_card.dart';
 import 'business_detail_screen.dart';
 import 'submit_info_screen.dart';
+import '../widgets/business_map_view.dart';
+import 'package:latlong2/latlong.dart' as latlong;
+import '../utils/time_utils.dart';
 
 // 메인 카테고리 (가나다 순)
 final ValueNotifier<String> infoMainCategoryNotifier = ValueNotifier<String>('지역');
@@ -54,6 +58,58 @@ class InfoScreen extends StatefulWidget {
 
 class _InfoScreenState extends State<InfoScreen> {
   final Map<String, GlobalKey> _subCatKeys = {};
+  bool _showMap = false;
+  String _sortMode = 'name_asc'; // name_asc, name_desc, dist_asc, dist_desc
+  bool _openNowFilter = false;
+  Position? _currentPosition;
+
+  List<BusinessModel>? _cachedBusinesses;
+
+  Future<void> _requestLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('위치 서비스가 비활성화되어 있습니다.')));
+      }
+      return;
+    }
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('위치 권한이 거부되었습니다.')));
+        }
+        return;
+      }
+    }
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('위치 권한이 영구적으로 거부되었습니다.')));
+      }
+      return;
+    }
+    final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    setState(() {
+      _currentPosition = position;
+      _sortMode = 'dist_asc';
+    });
+  }
+
+  double _getDistance(BusinessModel b) {
+    if (_currentPosition == null || b.address3.isEmpty) return double.maxFinite;
+    try {
+      final parts = b.address3.split(',');
+      if (parts.length == 2) {
+        final lat = double.parse(parts[0].trim());
+        final lng = double.parse(parts[1].trim());
+        return Geolocator.distanceBetween(_currentPosition!.latitude, _currentPosition!.longitude, lat, lng);
+      }
+    } catch (e) {
+      // ignore
+    }
+    return double.maxFinite;
+  }
 
   @override
   void initState() {
@@ -112,7 +168,7 @@ class _InfoScreenState extends State<InfoScreen> {
               child: GestureDetector(
                 onTap: widget.onNavigateHome,
                 child: Image.asset(
-                  isDarkMode ? 'assets/images/logo(r).jpg' : 'assets/images/logo.png',
+                  isDarkMode ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
                   height: 32,
                   errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
                 ),
@@ -398,36 +454,168 @@ class _InfoScreenState extends State<InfoScreen> {
                                     if (snapshot.hasError) {
                                       return const Center(child: Text('오류가 발생했습니다.'));
                                     }
-                                    if (snapshot.connectionState == ConnectionState.waiting) {
+                                    if (snapshot.connectionState == ConnectionState.waiting && _cachedBusinesses == null) {
                                       return const Center(child: CircularProgressIndicator());
                                     }
-                                    final docs = snapshot.data?.docs ?? [];
-                                    if (docs.isEmpty) {
-                                      return Center(
-                                        child: Text(
-                                          "'$region' 지역의 '$subCategory' 정보가 없습니다.",
-                                          style: TextStyle(
-                                            color: isDarkMode ? Colors.white70 : Colors.black54,
+                                    
+                                    if (snapshot.hasData) {
+                                      final docs = snapshot.data?.docs ?? [];
+                                      _cachedBusinesses = docs.map((doc) => BusinessModel.fromFirestore(doc)).toList();
+                                    }
+                                    
+                                    List<BusinessModel> businesses = _cachedBusinesses ?? [];
+
+                                    // 영업중 필터 적용
+                                    if (_openNowFilter) {
+                                      businesses = businesses.where((b) {
+                                        if (b.operatingHours.isEmpty) return false;
+                                        return TimeUtils.isOpenNow(b.operatingHours);
+                                      }).toList();
+                                    }
+
+                                    // 정렬 적용
+                                    businesses.sort((a, b) {
+                                      if (_sortMode.startsWith('name')) {
+                                        int cmp = a.name.compareTo(b.name);
+                                        return _sortMode == 'name_asc' ? cmp : -cmp;
+                                      } else {
+                                        double distA = _getDistance(a);
+                                        double distB = _getDistance(b);
+                                        int cmp = distA.compareTo(distB);
+                                        return _sortMode == 'dist_asc' ? cmp : -cmp;
+                                      }
+                                    });
+
+                                    return Column(
+                                      children: [
+                                        // 정렬 및 필터 영역
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                          child: Row(
+                                            children: [
+                                              // 정렬 버튼 (이름순)
+                                              InkWell(
+                                                onTap: () {
+                                                  setState(() {
+                                                    _sortMode = _sortMode == 'name_asc' ? 'name_desc' : 'name_asc';
+                                                  });
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: _sortMode.startsWith('name') ? Colors.blue.withOpacity(0.1) : Colors.transparent,
+                                                    border: Border.all(color: _sortMode.startsWith('name') ? Colors.blue : Colors.grey),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    '정렬(이름) ${_sortMode == 'name_asc' ? '↑' : '↓'}',
+                                                    style: TextStyle(fontSize: 12, color: _sortMode.startsWith('name') ? Colors.blue : Colors.grey),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              // 거리 버튼
+                                              InkWell(
+                                                onTap: () {
+                                                  if (_currentPosition == null) {
+                                                    _requestLocation();
+                                                  } else {
+                                                    setState(() {
+                                                      _sortMode = _sortMode == 'dist_asc' ? 'dist_desc' : 'dist_asc';
+                                                    });
+                                                  }
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: _sortMode.startsWith('dist') ? Colors.blue.withOpacity(0.1) : Colors.transparent,
+                                                    border: Border.all(color: _sortMode.startsWith('dist') ? Colors.blue : Colors.grey),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    '거리 ${_sortMode == 'dist_asc' ? '↑' : _sortMode == 'dist_desc' ? '↓' : ''}',
+                                                    style: TextStyle(fontSize: 12, color: _sortMode.startsWith('dist') ? Colors.blue : Colors.grey),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              // 지도보기 토글
+                                              InkWell(
+                                                onTap: () async {
+                                                  if (!_showMap && _currentPosition == null) {
+                                                    await _requestLocation();
+                                                  }
+                                                  setState(() {
+                                                    _showMap = !_showMap;
+                                                  });
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: _showMap ? Colors.blue.withOpacity(0.1) : Colors.transparent,
+                                                    border: Border.all(color: _showMap ? Colors.blue : Colors.grey),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.map, size: 14, color: _showMap ? Colors.blue : Colors.grey),
+                                                      const SizedBox(width: 4),
+                                                      Text('지도보기', style: TextStyle(fontSize: 12, color: _showMap ? Colors.blue : Colors.grey)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              // 영업중 체크박스
+                                              Row(
+                                                children: [
+                                                  SizedBox(
+                                                    width: 24,
+                                                    height: 24,
+                                                    child: Checkbox(
+                                                      value: _openNowFilter,
+                                                      onChanged: (val) {
+                                                        setState(() {
+                                                          _openNowFilter = val ?? false;
+                                                        });
+                                                      },
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  const Text('영업중', style: TextStyle(fontSize: 12)),
+                                                ],
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                      );
-                                    }
-                                    return ListView.builder(
-                                      itemCount: docs.length,
-                                      itemBuilder: (context, index) {
-                                        final business = BusinessModel.fromFirestore(docs[index]);
-                                        return BusinessCard(
-                                          business: business,
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => BusinessDetailScreen(business: business),
-                                              ),
-                                            );
-                                          },
-                                        );
-                                      },
+                                        Expanded(
+                                          child: _showMap
+                                              ? BusinessMapView(
+                                                  businesses: businesses,
+                                                  initialCenter: _currentPosition != null 
+                                                      ? latlong.LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+                                                      : null,
+                                                )
+                                              : ListView.builder(
+                                                  itemCount: businesses.length,
+                                                  itemBuilder: (context, index) {
+                                                    final business = businesses[index];
+                                                    return BusinessCard(
+                                                      business: business,
+                                                      onTap: () {
+                                                        Navigator.push(
+                                                          context,
+                                                          MaterialPageRoute(
+                                                            builder: (context) => BusinessDetailScreen(business: business),
+                                                          ),
+                                                        );
+                                                      },
+                                                    );
+                                                  },
+                                                ),
+                                        ),
+                                      ],
+
                                     );
                                   },
                                 );

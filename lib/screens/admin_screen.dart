@@ -7,16 +7,19 @@ import 'dart:typed_data';
 import '../services/firebase_storage_service.dart';
 import 'school_admin_detail_screen.dart';
 import 'post_detail_screen.dart';
+import '../widgets/business_map_view.dart';
 import '../models/business_model.dart';
 import '../widgets/business_card.dart';
 import '../widgets/add_business_dialog.dart';
 import 'business_detail_screen.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'info_screen.dart'; // for regionSubCategories
 import '../utils/time_utils.dart';
 import '../services/preferences_service.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key});
+  final String? initialTab;
+  const AdminScreen({super.key, this.initialTab});
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -36,6 +39,7 @@ class _AdminScreenState extends State<AdminScreen> {
   
   String _adminInfoSortMode = 'name_asc'; // 'name_asc', 'name_desc', 'dist_asc', 'dist_desc'
   bool _adminInfoOpenNowFilter = false;
+  bool _showMap = false;
   Position? _currentPosition;
   
   // 정렬 관련 상태
@@ -54,9 +58,15 @@ class _AdminScreenState extends State<AdminScreen> {
   late Stream<QuerySnapshot> _adminIndividualNoticeStream;
   late Stream<QuerySnapshot> _adminCommunityStream;
 
+  List<BusinessModel>? _cachedAdminBusinesses;
+
   @override
   void initState() {
     super.initState();
+    if (widget.initialTab != null && _tabs.contains(widget.initialTab)) {
+      _selectedTab = widget.initialTab!;
+    }
+
     
     final String defaultRegion = PreferencesService.defaultRegion;
     if (_regions.contains(defaultRegion)) {
@@ -557,7 +567,7 @@ class _AdminScreenState extends State<AdminScreen> {
         title: Row(
           children: [
             Image.asset(
-              Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo(r).jpg' : 'assets/images/logo.png',
+              Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
               height: 32,
               errorBuilder: (context, error, stackTrace) => Icon(Icons.admin_panel_settings, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
             ),
@@ -571,6 +581,37 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ],
         ),
+        actions: [
+          ValueListenableBuilder<List<Map<String, dynamic>>>(
+            valueListenable: PreferencesService.favoritesNotifier,
+            builder: (context, favorites, _) {
+              final String favId = 'admin_tab_$_selectedTab';
+              final isFav = favorites.any((e) => e['id'] == favId);
+              return IconButton(
+                icon: Icon(
+                  isFav ? Icons.star : Icons.star_border,
+                  color: isFav ? Colors.amber : (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                ),
+                onPressed: () {
+                  if (isFav) {
+                    PreferencesService.removeFavorite(favId);
+                  } else {
+                    PreferencesService.addFavorite({
+                      'id': favId,
+                      'type': 'menu',
+                      'title': '관리 - $_selectedTab',
+                      'iconCodePoint': Icons.admin_panel_settings.codePoint,
+                      'iconFontFamily': Icons.admin_panel_settings.fontFamily,
+                      'colorValue': 0xFFE6F3FF, // Light blue
+                      'isAdminMenu': true,
+                      'adminTab': _selectedTab,
+                    });
+                  }
+                },
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -1127,9 +1168,9 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ],
         ),
-        // 제보 리스트 (상단 고정 높이 4줄 정도 스크롤)
+        // 제보 리스트 (상단 고정 높이 3줄 정도 스크롤)
         Container(
-          height: 200,
+          height: 120,
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
           ),
@@ -1157,23 +1198,32 @@ class _AdminScreenState extends State<AdminScreen> {
                   final type = data['type'] ?? '기타';
                   final businessPath = data['businessPath'] ?? type;
                   final reporterName = data['reporterName'] ?? data['userEmail'] ?? 'Unknown';
-                  final content = data['content'] ?? '';
 
                   return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
+                    margin: const EdgeInsets.only(bottom: 4),
                     color: isDarkMode ? Colors.grey[850] : Colors.white,
                     child: InkWell(
                       onTap: () => _showInfoSuggestionPopup(context, docId, data, isDarkMode),
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Text('[제보] $businessPath', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDarkMode ? Colors.white : Colors.black)),
-                            const SizedBox(height: 4),
-                            Text('제보자: $reporterName', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                            const SizedBox(height: 4),
-                            Text(content, style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+                            Expanded(
+                              child: Text(
+                                '[제보] $businessPath',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDarkMode ? Colors.white : Colors.black),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              reporterName,
+                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
                       ),
@@ -1337,6 +1387,33 @@ class _AdminScreenState extends State<AdminScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  // 지도보기 토글
+                  InkWell(
+                    onTap: () async {
+                      if (!_showMap && _currentPosition == null) {
+                        await _requestLocation();
+                      }
+                      setState(() {
+                        _showMap = !_showMap;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _showMap ? Colors.blue.withOpacity(0.1) : Colors.transparent,
+                        border: Border.all(color: _showMap ? Colors.blue : Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.map, size: 14, color: _showMap ? Colors.blue : Colors.grey),
+                          const SizedBox(width: 4),
+                          Text('지도보기', style: TextStyle(fontSize: 12, color: _showMap ? Colors.blue : Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ),
                   const Spacer(),
                   // 영업중 필터
                   Row(
@@ -1366,9 +1443,16 @@ class _AdminScreenState extends State<AdminScreen> {
                 : FirebaseFirestore.instance.collection('directory').where('region', isEqualTo: _adminInfoRegion).where('subCategory', isEqualTo: _adminInfoSubCategory).snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) return const Center(child: Text('오류가 발생했습니다.'));
-              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-              final docs = snapshot.data?.docs ?? [];
-              if (docs.isEmpty) {
+              if (snapshot.connectionState == ConnectionState.waiting && _cachedAdminBusinesses == null) return const Center(child: CircularProgressIndicator());
+              
+              if (snapshot.hasData) {
+                final docs = snapshot.data?.docs ?? [];
+                _cachedAdminBusinesses = docs.map((doc) => BusinessModel.fromFirestore(doc)).toList();
+              }
+              
+              var businesses = _cachedAdminBusinesses ?? [];
+              
+              if (businesses.isEmpty) {
                 return Center(
                   child: Text(
                     "'$_adminInfoRegion' 지역의 '$_adminInfoSubCategory' 정보가 없습니다.",
@@ -1376,8 +1460,6 @@ class _AdminScreenState extends State<AdminScreen> {
                   ),
                 );
               }
-              
-              var businesses = docs.map((doc) => BusinessModel.fromFirestore(doc)).toList();
               
               // 영업중 필터
               if (_adminInfoOpenNowFilter) {
@@ -1410,13 +1492,24 @@ class _AdminScreenState extends State<AdminScreen> {
                 );
               }
 
+              if (_showMap) {
+                return BusinessMapView(
+                  businesses: businesses,
+                  initialCenter: _currentPosition != null
+                      ? latlong.LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+                      : null,
+                );
+              }
+
               return ListView.builder(
                 padding: const EdgeInsets.all(8),
                 itemCount: businesses.length,
                 itemBuilder: (context, index) {
                   final business = businesses[index];
+                  final distance = _getDistance(business);
                   return BusinessCard(
                     business: business,
+                    distance: distance != double.maxFinite ? distance : null,
                     onTap: () {
                       Navigator.push(
                         context,

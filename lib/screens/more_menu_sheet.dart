@@ -7,6 +7,7 @@ import 'login_screen.dart';
 import 'profile_edit_screen.dart';
 
 import 'settings_screen.dart';
+import '../widgets/global_upload_indicator.dart';
 
 class MoreMenuSheet extends StatefulWidget {
   final void Function(Widget)? onNavigate;
@@ -34,6 +35,28 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
   }
 
   void _logout() async {
+    if (globalUploadingNotifier.value.isNotEmpty) {
+      final bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('경고'),
+          content: const Text('현재 백그라운드에서 업체 정보 업로드가 진행 중입니다. 로그아웃하시면 업로드가 중단되고 데이터가 유실될 수 있습니다. 정말 로그아웃 하시겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('취소', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('로그아웃', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
+
     await FirebaseAuth.instance.signOut();
     await GoogleSignIn(
       clientId:

@@ -8,6 +8,7 @@ import 'submit_info_screen.dart';
 import 'image_viewer_screen.dart';
 import '../utils/telecom_utils.dart';
 import '../services/preferences_service.dart';
+import '../utils/ui_utils.dart';
 
 class BusinessDetailScreen extends StatefulWidget {
   final BusinessModel business;
@@ -156,24 +157,24 @@ class _BusinessDetailScreenContent extends StatelessWidget {
     String prefix = '';
     String cleanSns = sns.trim();
     
-    if (cleanSns.toLowerCase().startsWith('k')) {
+    if (RegExp(r'^(k|ㅏ)/', caseSensitive: false).hasMatch(cleanSns)) {
       prefix = '[카카오톡] ';
-      cleanSns = cleanSns.substring(1).trim();
-    } else if (cleanSns.toLowerCase().startsWith('l')) {
+      cleanSns = cleanSns.substring(2).trim();
+    } else if (RegExp(r'^(l|ㅣ)/', caseSensitive: false).hasMatch(cleanSns)) {
       prefix = '[라인] ';
-      cleanSns = cleanSns.substring(1).trim();
-    } else if (cleanSns.toLowerCase().startsWith('w')) {
+      cleanSns = cleanSns.substring(2).trim();
+    } else if (RegExp(r'^(w|ㅈ)/', caseSensitive: false).hasMatch(cleanSns)) {
       prefix = '[위챗] ';
-      cleanSns = cleanSns.substring(1).trim();
-    } else if (cleanSns.toLowerCase().startsWith('f')) {
+      cleanSns = cleanSns.substring(2).trim();
+    } else if (RegExp(r'^(f|ㄹ)/', caseSensitive: false).hasMatch(cleanSns)) {
       prefix = '[페이스북] ';
-      cleanSns = cleanSns.substring(1).trim();
-    } else if (cleanSns.toLowerCase().startsWith('i')) {
+      cleanSns = cleanSns.substring(2).trim();
+    } else if (RegExp(r'^(i|ㅑ)/', caseSensitive: false).hasMatch(cleanSns)) {
       prefix = '[인스타그램] ';
-      cleanSns = cleanSns.substring(1).trim();
-    } else if (cleanSns.toLowerCase().startsWith('t')) {
+      cleanSns = cleanSns.substring(2).trim();
+    } else if (RegExp(r'^(t|ㅅ)/', caseSensitive: false).hasMatch(cleanSns)) {
       prefix = '[텔레그램] ';
-      cleanSns = cleanSns.substring(1).trim();
+      cleanSns = cleanSns.substring(2).trim();
     }
     
     return '$prefix$cleanSns';
@@ -225,8 +226,8 @@ class _BusinessDetailScreenContent extends StatelessWidget {
 
   Future<void> _handleSnsAction(BuildContext context, String snsPart) async {
     String cleanSns = snsPart.trim();
-    if (RegExp(r'^[klwfitKLWFIT]').hasMatch(cleanSns)) {
-      cleanSns = cleanSns.substring(1).trim();
+    if (RegExp(r'^([klwfitKLWFIT]|[ㅏㅣㅈㄹㅑㅅ])/', caseSensitive: false).hasMatch(cleanSns)) {
+      cleanSns = cleanSns.substring(2).trim();
     }
     
     final match = RegExp(r'https?://[^\s]+').firstMatch(cleanSns);
@@ -235,9 +236,7 @@ class _BusinessDetailScreenContent extends StatelessWidget {
       await _launchUrl(url);
     } else {
       Clipboard.setData(ClipboardData(text: cleanSns));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('SNS 아이디가 복사되었습니다.')),
-      );
+      UiUtils.showPopup(context, 'SNS 아이디가 복사되었습니다.');
     }
   }
 
@@ -381,40 +380,48 @@ class _BusinessDetailScreenContent extends StatelessWidget {
           children: [
             // Thumbnail / Header Image
             if (business.thumbnailUrl.isNotEmpty)
-              CachedNetworkImage(
-                imageUrl: business.thumbnailUrl,
-                height: 250,
-                fit: BoxFit.cover,
-                memCacheWidth: 600, // Optimize memory for detail view
-                maxWidthDiskCache: 1200,
-                placeholder: (context, url) => Container(
-                  height: 250,
-                  color: Colors.grey[300],
-                  child: const Center(child: CircularProgressIndicator()),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  height: 250,
-                  color: Colors.white,
-                  child: Image.asset(
-                    _getPlaceholderImage(business.subCategory),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.business, size: 100, color: Colors.grey),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: CachedNetworkImage(
+                    imageUrl: business.thumbnailUrl,
+                    fit: BoxFit.contain,
+                    memCacheWidth: 600, // Optimize memory for detail view
+                    maxWidthDiskCache: 1200,
+                    placeholder: (context, url) => Container(
+                      color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: isDarkMode ? Colors.black : Colors.white,
+                      child: Image.asset(
+                        _getPlaceholderImage(business.subCategory),
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                          child: const Icon(Icons.business, size: 100, color: Colors.grey),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               )
             else
-              Container(
-                height: 250,
-                color: Colors.white,
-                child: Image.asset(
-                  _getPlaceholderImage(business.subCategory),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.business, size: 100, color: Colors.grey),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: Container(
+                    color: isDarkMode ? Colors.black : Colors.white,
+                    child: Image.asset(
+                      _getPlaceholderImage(business.subCategory),
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                        child: const Icon(Icons.business, size: 100, color: Colors.grey),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -430,11 +437,37 @@ class _BusinessDetailScreenContent extends StatelessWidget {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    business.description,
-                    style: const TextStyle(fontSize: 16, height: 1.5),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: business.description
+                        .split('\n')
+                        .map((line) => line.trim())
+                        .where((line) => line.isNotEmpty)
+                        .map((line) {
+                      if (line.startsWith('-')) {
+                        line = line.substring(1).trim();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '- ',
+                              style: TextStyle(fontSize: 16, height: 1.5),
+                            ),
+                            Expanded(
+                              child: Text(
+                                line,
+                                style: const TextStyle(fontSize: 16, height: 1.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   // Info Cards
                   _buildInfoRow(
                     icon: Icons.location_on,
@@ -551,10 +584,13 @@ class _BusinessDetailScreenContent extends StatelessWidget {
   String _getPlaceholderImage(String category) {
     String assetPath = 'assets/images/logo.png'; // default
     if (category.contains('쇼핑')) assetPath = 'assets/images/ph_shopping.png';
-    else if (category.contains('식당') || category.contains('음식')) assetPath = 'assets/images/ph_food.png';
-    else if (category.contains('카페') || category.contains('마사지') || category.contains('뷰티')) assetPath = 'assets/images/ph_cafe.png';
+    else if (category.contains('식당') || category.contains('음식')) assetPath = 'assets/images/ph_restaurant.png';
+    else if (category.contains('카페')) assetPath = 'assets/images/ph_cafebar.png';
+    else if (category.contains('마사지')) assetPath = 'assets/images/ph_massage.png';
+    else if (category.contains('뷰티')) assetPath = 'assets/images/ph_beauty.png';
     else if (category.contains('환전') || category.contains('은행')) assetPath = 'assets/images/ph_exchange.png';
-    else if (category.contains('관광') || category.contains('여행')) assetPath = 'assets/images/ph_tour.png';
+    else if (category.contains('관광') || category.contains('여행')) assetPath = 'assets/images/ph_travel.png';
+    else if (category.contains('병원')) assetPath = 'assets/images/ph_hospital.png';
     return assetPath;
   }
 

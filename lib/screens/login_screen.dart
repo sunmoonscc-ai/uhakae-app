@@ -276,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               Image.asset(
                 isDarkMode
-                    ? 'assets/images/logo(r).jpg'
+                    ? 'assets/images/logo_dark.png'
                     : 'assets/images/logo.png',
                 height: 80,
                 errorBuilder: (context, error, stackTrace) => Icon(
