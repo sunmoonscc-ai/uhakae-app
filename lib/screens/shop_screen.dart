@@ -76,6 +76,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                 onTap: widget.onNavigateHome,
                 child: Image.asset(
                   'assets/images/logo.png',
+                  height: 32,
                   errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
                 ),
               ),
