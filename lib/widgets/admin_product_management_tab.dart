@@ -24,6 +24,7 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
     final descCtrl = TextEditingController(text: existingData?['description'] ?? '');
     final quantityCtrl = TextEditingController(text: existingData != null ? (existingData['totalQuantity']?.toString() ?? '999') : (widget.productType == 'rent' ? '' : '999'));
     String status = existingData?['stockStatus'] ?? 'in_stock';
+    bool isBankTransferOnly = existingData?['isBankTransferOnly'] ?? false;
     String? existingImageUrl = existingData?['imageUrl'];
     XFile? selectedImage;
     bool isUploading = false;
@@ -51,6 +52,7 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
       if (quantityCtrl.text.trim() != origQuantityStr) return true;
       
       if (status != (existingData?['stockStatus'] ?? 'in_stock')) return true;
+      if (isBankTransferOnly != (existingData?['isBankTransferOnly'] ?? false)) return true;
       
       return false;
     }
@@ -90,8 +92,8 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
               },
               child: AlertDialog(
                 title: Text(docId == null 
-                  ? (widget.productType == 'buy' ? '판매상품 등록' : '대여상품 등록') 
-                  : (widget.productType == 'buy' ? '판매상품 수정' : '대여상품 수정')),
+                  ? (widget.productType == 'buy' ? '판매물품 등록' : '대여물품 등록') 
+                  : (widget.productType == 'buy' ? '판매물품 수정' : '대여물품 수정')),
                 content: SizedBox(
                   width: 400,
                   child: SingleChildScrollView(
@@ -100,7 +102,7 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
                     children: [
                       TextField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: '상품명'),
+                      decoration: const InputDecoration(labelText: '물품명'),
                     ),
                     const SizedBox(height: 8),
                     TextField(
@@ -141,6 +143,15 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
                       ],
                       onChanged: (val) {
                         if (val != null) setState(() => status = val);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      title: const Text('계좌이체로만 가능 (포인트 충전용)'),
+                      subtitle: const Text('체크 시 이 물품은 계좌이체로만 결제할 수 있으며, 이체 확인 시 사용자에게 금액만큼 포인트가 충전됩니다.'),
+                      value: isBankTransferOnly,
+                      onChanged: (val) {
+                        setState(() => isBankTransferOnly = val);
                       },
                     ),
                     const SizedBox(height: 16),
@@ -245,6 +256,7 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
                         'imageUrl': finalImageUrl,
                         'totalQuantity': int.tryParse(quantityCtrl.text.trim()) ?? 999,
                         'stockStatus': status,
+                        'isBankTransferOnly': isBankTransferOnly,
                         'updatedAt': FieldValue.serverTimestamp(),
                       };
 
@@ -279,7 +291,7 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('삭제 확인'),
-        content: Text("'$name' 상품을 삭제하시겠습니까?"),
+        content: Text("'$name' 물품을 삭제하시겠습니까?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
           ElevatedButton(
@@ -309,13 +321,13 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                widget.productType == 'buy' ? '판매 상품 목록' : '대여 상품 목록',
+                widget.productType == 'buy' ? '판매 물품 목록' : '대여 물품 목록',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               ElevatedButton.icon(
                 onPressed: () => _showProductDialog(),
                 icon: const Icon(Icons.add),
-                label: const Text('상품 추가'),
+                label: const Text('물품 추가'),
               ),
             ],
           ),
@@ -344,7 +356,7 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
                 if (bTime == null) return -1;
                 return bTime.compareTo(aTime);
               });
-              if (docs.isEmpty) return const Center(child: Text('등록된 상품이 없습니다.'));
+              if (docs.isEmpty) return const Center(child: Text('등록된 물품이 없습니다.'));
 
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 16),

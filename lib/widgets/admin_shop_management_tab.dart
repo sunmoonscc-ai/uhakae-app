@@ -104,6 +104,14 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
               },
               child: const Text('취소', style: TextStyle(color: Colors.red)),
             ),
+            ElevatedButton(
+              onPressed: () async {
+                isCancelled = true; // Prevent the auto-timer from firing again
+                Navigator.of(dialogContext).pop();
+                await onConfirm();
+              },
+              child: const Text('즉시 승인'),
+            ),
           ],
         );
       },
@@ -191,21 +199,33 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
     );
   }
 
-  void _handleGroupDeductPoints(OrderGroup group) {
+  void _handleGroupDeductPoints(OrderGroup group, String userDocId) {
     _showAutoConfirmDialog(
       title: '바우처 결제 처리',
       content: '총액 ₩${NumberFormat('#,###').format(group.totalKrw.toInt())}을 차감하고 배송준비 상태로 변경하시겠습니까?\n(3초 후 자동으로 승인됩니다. 취소하려면 취소 버튼을 누르세요.)',
       onConfirm: () async {
         bool allSuccess = true;
         for (var order in group.orders) {
-          final success = await _orderService.deductPointsAndPrepare(order.id, order.userId, order.totalKrw);
+          final success = await _orderService.deductPointsAndPrepare(order.id, userDocId, order.totalKrw);
           if (!success) allSuccess = false;
         }
         if (context.mounted) {
           if (allSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('처리되었습니다.')));
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('일부 처리에 실패했습니다. (포인트 부족 등)')));
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('처리 실패'),
+                content: const Text('해당 사용자의 보유 포인트가 부족하여 결제(차감) 처리에 실패했습니다.\n사용자 관리에서 포인트를 먼저 지급해 주세요.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('확인'),
+                  ),
+                ],
+              ),
+            );
           }
         }
       },
@@ -313,18 +333,31 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                   final isSelected = _selectedStatusFilter == status;
                   final count = getStatusCount(status);
                   
+                  Color getStatusColor(String status) {
+                    switch (status) {
+                      case 'pending': return Colors.orange.withValues(alpha: 0.7);
+                      case 'approved': return Colors.green.withValues(alpha: 0.3);
+                      case 'preparing': return Colors.green.withValues(alpha: 0.6);
+                      case 'shipping': return Colors.green.withValues(alpha: 0.9);
+                      case 'completed': return Colors.blue.withValues(alpha: 0.7);
+                      default: return Colors.transparent;
+                    }
+                  }
+
                   return Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedStatusFilter = status;
-                        });
-                      },
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedStatusFilter = status;
+                          });
+                        },
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 2.0),
                         padding: const EdgeInsets.symmetric(vertical: 8.0),
                         decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFF00D1B2) : Colors.transparent,
+                          color: isSelected ? getStatusColor(status) : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         alignment: Alignment.center,
@@ -338,6 +371,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+                    ),
                     ),
                   );
                 }).toList(),
@@ -355,11 +389,25 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                   
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: group.orders.isNotEmpty && group.orders.first.userEmail != null 
+                          ? FirebaseFirestore.instance.collection('users').where('email', isEqualTo: group.orders.first.userEmail).limit(1).snapshots()
+                          : FirebaseFirestore.instance.collection('users').where('dummy', isEqualTo: 'dummy').snapshots(),
+                      builder: (context, userSnapshot) {
+                        int userPoints = 0;
+                        String? userDocId;
+                        if (userSnapshot.hasData && userSnapshot.data!.docs.isNotEmpty) {
+                          final userDoc = userSnapshot.data!.docs.first;
+                          userDocId = userDoc.id;
+                          final userData = userDoc.data() as Map<String, dynamic>;
+                          userPoints = (userData['points'] as num?)?.toInt() ?? 0;
+                        }
+                        
+                        return Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -424,10 +472,16 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                                       flex: 1,
                                       child: Padding(
                                         padding: const EdgeInsets.only(right: 12.0),
-                                        child: Text(
-                                          '₩${NumberFormat('#,###').format(priceKrw)}', 
-                                          style: const TextStyle(fontWeight: FontWeight.w500),
-                                          textAlign: TextAlign.right,
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          children: [
+                                            const Icon(Icons.savings_outlined, size: 14),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              NumberFormat('#,###').format(priceKrw), 
+                                              style: const TextStyle(fontWeight: FontWeight.w500),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
@@ -471,34 +525,49 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                           }).toList(),
 
                           const SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.only(right: 12.0),
-                                child: Text('총액: ₩${NumberFormat('#,###').format(group.totalKrw.toInt())}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                                padding: const EdgeInsets.only(left: 8.0),
+                                child: Row(
+                                  children: [
+                                    const Text('보유 포인트: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                                    const Icon(Icons.savings_outlined, color: Colors.blue, size: 16),
+                                    const SizedBox(width: 2),
+                                    Text(NumberFormat('#,###').format(userPoints), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                                  ],
+                                ),
                               ),
-                              if (_selectedStatusFilter == 'pending') const SizedBox(width: 100),
+                              Row(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 12.0),
+                                    child: Row(
+                                      children: [
+                                        const Text('총액: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                                        const Icon(Icons.savings_outlined, color: Colors.redAccent, size: 16),
+                                        const SizedBox(width: 2),
+                                        Text(NumberFormat('#,###').format(group.totalKrw.toInt()), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                                      ],
+                                    ),
+                                  ),
+                                  if (_selectedStatusFilter == 'pending') const SizedBox(width: 100),
+                                ],
+                              ),
                             ],
                           ),
                           const Divider(),
                           
                           // 상태별 액션 버튼 (그룹)
-                          if (_buildActionButtons(group).isNotEmpty)
-                            Row(
-                              children: _buildActionButtons(group)
-                                  .map((widget) => Expanded(
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                          child: widget,
-                                        ),
-                                      ))
-                                  .toList(),
-                            )
+                          _buildActionButtonsWidget(group, userPoints, userDocId),
                         ],
                       ),
-                    ),
-                  );
+                    );
+                  },
+                ),
+              );
                 },
               ),
             ),
@@ -508,55 +577,108 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
     );
   }
 
-  List<Widget> _buildActionButtons(OrderGroup group) {
+  Widget _buildActionButtonsWidget(OrderGroup group, int userPoints, String? userDocId) {
     if (_selectedStatusFilter == 'pending') {
-      return [
-        OutlinedButton(
-          onPressed: () => _showGroupRejectDialog(group),
-          style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-          child: const Text('전체 거절'),
-        ),
-        ElevatedButton(
-          onPressed: () => _showGroupApproveDialog(group),
-          child: const Text('전체 승인'),
-        ),
-      ];
-    } else {
-      if (group.status == 'approved') {
-        return [
-          ElevatedButton(
-            onPressed: () => _handleGroupDeductPoints(group),
-            child: const Text('바우처 결제 처리'),
-          ),
-          OutlinedButton(
-            onPressed: () {
-              _showAutoConfirmDialog(
-                title: '수동 결제 확인',
-                content: '결제를 확인하고 배송준비 상태로 변경하시겠습니까?\n(3초 후 자동으로 승인됩니다. 취소하려면 취소 버튼을 누르세요.)',
-                onConfirm: () async {
-                  for (var order in group.orders) {
-                    await _orderService.updateOrderStatusByAdmin(order.id, 'preparing');
-                  }
-                },
-              );
-            },
-            child: const Text('수동 결제 확인'),
-          ),
-        ];
-      } else if (group.status == 'preparing') {
-        return [
-          ElevatedButton(
+      return Row(
+        children: [
+          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: OutlinedButton(
+            onPressed: () => _showGroupRejectDialog(group),
+            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('전체 거절'),
+          ))),
+          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: ElevatedButton(
+            onPressed: () => _showGroupApproveDialog(group),
+            child: const Text('전체 승인'),
+          ))),
+        ],
+      );
+    } else if (group.status == 'approved') {
+      final productIds = group.orders.expand((o) => o.items).map((i) => i['productId'] as String).toSet().toList();
+      
+      return FutureBuilder<QuerySnapshot>(
+        future: FirebaseFirestore.instance.collection('products').where(FieldPath.documentId, whereIn: productIds.isNotEmpty ? productIds : ['dummy']).get(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
+            );
+          }
+          
+          bool hasBankTransferOnly = false;
+          if (snapshot.hasData) {
+            for (var doc in snapshot.data!.docs) {
+              if ((doc.data() as Map<String, dynamic>)['isBankTransferOnly'] == true) {
+                hasBankTransferOnly = true;
+                break;
+              }
+            }
+          }
+
+          final bool canPayWithPoints = userPoints >= group.totalKrw;
+          
+          return Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: OutlinedButton(
+                    onPressed: () {
+                      _showAutoConfirmDialog(
+                        title: '계좌이체 확인됨',
+                        content: '결제를 확인하고 배송준비 상태로 변경하시겠습니까?\n(3초 후 자동으로 승인됩니다. 취소하려면 취소 버튼을 누르세요.)',
+                        onConfirm: () async {
+                          for (var order in group.orders) {
+                            if (hasBankTransferOnly && userDocId != null) {
+                              await _orderService.confirmBankTransfer(order.id, userDocId);
+                            } else {
+                              await _orderService.updateOrderStatusByAdmin(order.id, 'preparing');
+                            }
+                          }
+                        },
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.black87),
+                    child: const Text('계좌이체확인됨'),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: ElevatedButton(
+                    onPressed: (!hasBankTransferOnly && canPayWithPoints && userDocId != null) ? () => _handleGroupDeductPoints(group, userDocId) : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey[300],
+                      disabledForegroundColor: Colors.grey[600],
+                    ),
+                    child: const Text('포인트로결제진행'),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    } else if (group.status == 'preparing') {
+      return Row(
+        children: [
+          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: ElevatedButton(
             onPressed: () async {
               for (var order in group.orders) {
                 await _orderService.updateOrderStatusByAdmin(order.id, 'shipping');
               }
             },
             child: const Text('배송 시작'),
-          ),
-        ];
-      } else if (group.status == 'shipping') {
-        return [
-          ElevatedButton(
+          ))),
+        ],
+      );
+    } else if (group.status == 'shipping') {
+      return Row(
+        children: [
+          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: ElevatedButton(
             onPressed: () async {
               for (var order in group.orders) {
                 await _orderService.updateOrderStatusByAdmin(order.id, 'delivered');
@@ -564,25 +686,27 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: const Text('배송 완료 처리', style: TextStyle(color: Colors.white)),
-          ),
-        ];
-      } else if (group.status == 'not_received') {
-        return [
-          ElevatedButton(
+          ))),
+        ],
+      );
+    } else if (group.status == 'not_received') {
+      return Row(
+        children: [
+          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: ElevatedButton(
             onPressed: () async {
               for (var order in group.orders) {
                 await _orderService.updateOrderStatusByAdmin(order.id, 'delivered');
               }
             },
             child: const Text('재배송 완료'),
-          ),
-          OutlinedButton(
+          ))),
+          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: OutlinedButton(
             onPressed: () => _showGroupRejectDialog(group),
             child: const Text('주문 취소'),
-          )
-        ];
-      }
+          ))),
+        ],
+      );
     }
-    return [];
+    return const SizedBox.shrink();
   }
 }

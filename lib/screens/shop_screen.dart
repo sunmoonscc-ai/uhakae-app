@@ -6,6 +6,7 @@ import 'package:study_abroad_app/services/cart_provider.dart';
 import 'package:study_abroad_app/services/shop_service.dart';
 import 'package:study_abroad_app/widgets/product_card.dart';
 import 'package:study_abroad_app/screens/order_history_screen.dart';
+import 'package:study_abroad_app/widgets/point_history_dialog.dart';
 import '../services/preferences_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -40,9 +41,9 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.white,
         elevation: 0,
         title: Row(
           children: [
@@ -51,7 +52,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
               child: GestureDetector(
                 onTap: widget.onNavigateHome,
                 child: Image.asset(
-                  'assets/images/logo.png',
+                  (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
                   height: 32,
                   errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
                 ),
@@ -106,19 +107,30 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                             pointColor = Colors.orange;
                           }
 
-                          return Row(
-                            children: [
-                              Icon(Icons.savings_outlined, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, size: 20),
-                              const SizedBox(width: 2),
-                              Text(
-                                NumberFormat('#,###').format(points),
-                                style: TextStyle(
-                                  color: pointColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
+                          return InkWell(
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => const PointHistoryDialog(),
+                              );
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.savings_outlined, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, size: 20),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    NumberFormat('#,###').format(points),
+                                    style: TextStyle(
+                                      color: pointColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           );
                         },
                       );
@@ -259,20 +271,20 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
       body: Column(
         children: [
           Container(
-            color: Colors.white,
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: const Text(
-              '필수 아이템을 안전하고 편리하게 이용하세요. 필요한 상품 구매를 요청하거나 장비를 대여할 수 있습니다.',
+              '필수 아이템을 안전하고 편리하게 이용하세요. 필요한 물품 구매를 요청하거나 장비를 대여할 수 있습니다.',
               style: TextStyle(color: Colors.grey),
             ),
           ),
           Container(
-            color: Colors.white,
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.white,
             child: TabBar(
               controller: _tabController,
-              labelColor: Colors.black,
+              labelColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
               unselectedLabelColor: Colors.grey,
-              indicatorColor: Colors.black,
+              indicatorColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
               tabs: const [
                 Tab(text: '구매 대행'),
                 Tab(text: '대여'),
@@ -288,7 +300,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                 } else if (snapshot.hasError) {
                   return Center(child: Text('에러 발생: ${snapshot.error}'));
                 } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('상품이 없습니다.'));
+                  return const Center(child: Text('물품이 없습니다.'));
                 }
 
                 final allProducts = snapshot.data!;
@@ -312,7 +324,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
 
   Widget _buildProductList(List<Product> products) {
     if (products.isEmpty) {
-      return const Center(child: Text('등록된 상품이 없습니다.'));
+      return const Center(child: Text('등록된 물품이 없습니다.'));
     }
     return ListView.builder(
       itemCount: products.length,

@@ -13,8 +13,6 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currencyFormatter = NumberFormat('#,##0', 'en_US');
-    final krwPriceStr = '₩${currencyFormatter.format(product.priceKrw)}';
-    final depositStr = '보증금 ₩${currencyFormatter.format(product.depositKrw)}';
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -127,16 +125,28 @@ class ProductCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
+                        const Icon(Icons.savings_outlined, color: Colors.blueAccent, size: 18),
+                        const SizedBox(width: 2),
                         Text(
-                          krwPriceStr,
+                          currencyFormatter.format(product.priceKrw),
                           style: const TextStyle(
                               color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         const SizedBox(width: 8),
                         if (product.type == 'rent' && product.depositKrw > 0)
-                          Text(
-                            depositStr,
-                            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                          Row(
+                            children: [
+                              Text(
+                                '보증금 ',
+                                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                              ),
+                              Icon(Icons.savings_outlined, color: Colors.grey[500], size: 14),
+                              const SizedBox(width: 2),
+                              Text(
+                                currencyFormatter.format(product.depositKrw),
+                                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                              ),
+                            ],
                           ),
                       ],
                     ),

@@ -279,7 +279,7 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Image.asset(
-                'assets/images/logo.png',
+                (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
                 height: 80,
                 errorBuilder: (context, error, stackTrace) => Icon(
                   Icons.school,

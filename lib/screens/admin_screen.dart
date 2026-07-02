@@ -598,16 +598,18 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
         elevation: 0,
         iconTheme: IconThemeData(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
         title: Row(
           children: [
             Image.asset(
-              'assets/images/logo.png',
+              isDarkMode ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
               height: 32,
               errorBuilder: (context, error, stackTrace) => Icon(Icons.admin_panel_settings, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
             ),
@@ -657,7 +659,7 @@ class _AdminScreenState extends State<AdminScreen> {
         children: [
           // 상단 탭 영역
           Container(
-            color: Colors.white,
+            color: isDarkMode ? Colors.grey[900] : Colors.white,
             height: 60,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
@@ -687,7 +689,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       tabName,
                       style: TextStyle(
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? Colors.blue : Colors.black54,
+                        color: isSelected ? Colors.blue : (isDarkMode ? Colors.white54 : Colors.black54),
                       ),
                     ),
                   ),
@@ -2956,7 +2958,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   if (['pending', 'approved', 'preparing', 'shipping'].contains(status)) {
                     final items = data['items'] as List<dynamic>? ?? [];
                     for (var item in items) {
-                      final itemId = item['id'];
+                      final itemId = item['productId'];
                       final quantity = item['quantity'] ?? 1;
                       if (itemId != null) {
                         itemActiveCount[itemId] = (itemActiveCount[itemId] ?? 0) + (quantity as int);
@@ -2979,19 +2981,19 @@ class _AdminScreenState extends State<AdminScreen> {
                           const Divider(),
                           Row(
                             children: [
-                              Expanded(child: _buildStatItem('승인대기', pending.toString(), Colors.orange, onTap: () {
+                              Expanded(child: _buildStatItem('승인대기', pending.toString(), Colors.orange[700]!, onTap: () {
                                 setState(() { _conciergeSubTab = '주문관리'; _adminOrderFilter = 'pending'; });
                               })),
-                              Expanded(child: _buildStatItem('결제진행', approved.toString(), Colors.blue, onTap: () {
+                              Expanded(child: _buildStatItem('결제진행', approved.toString(), Colors.green[300]!, onTap: () {
                                 setState(() { _conciergeSubTab = '주문관리'; _adminOrderFilter = 'approved'; });
                               })),
-                              Expanded(child: _buildStatItem('배송준비', preparing.toString(), Colors.amber, onTap: () {
+                              Expanded(child: _buildStatItem('배송준비', preparing.toString(), Colors.green[600]!, onTap: () {
                                 setState(() { _conciergeSubTab = '주문관리'; _adminOrderFilter = 'preparing'; });
                               })),
-                              Expanded(child: _buildStatItem('배송중', shipping.toString(), Colors.purple, onTap: () {
+                              Expanded(child: _buildStatItem('배송중', shipping.toString(), Colors.green[900]!, onTap: () {
                                 setState(() { _conciergeSubTab = '주문관리'; _adminOrderFilter = 'shipping'; });
                               })),
-                              Expanded(child: _buildStatItem('완료', completed.toString(), Colors.green, onTap: () {
+                              Expanded(child: _buildStatItem('완료', completed.toString(), Colors.blue[700]!, onTap: () {
                                 setState(() { _conciergeSubTab = '주문관리'; _adminOrderFilter = 'completed'; });
                               })),
                             ],
@@ -3016,11 +3018,11 @@ class _AdminScreenState extends State<AdminScreen> {
                       
                       return Column(
                         children: [
-                          _buildProductListCard('판매 상품 현황', buyProducts, itemActiveCount, isDarkMode, onTapItem: () {
+                          _buildProductListCard('판매 물품 현황', buyProducts, itemActiveCount, isDarkMode, onTapItem: () {
                             setState(() { _conciergeSubTab = '판매관리'; });
                           }),
                           const SizedBox(height: 16),
-                          _buildProductListCard('대여 상품 현황', rentProducts, itemActiveCount, isDarkMode, onTapItem: () {
+                          _buildProductListCard('대여 물품 현황', rentProducts, itemActiveCount, isDarkMode, onTapItem: () {
                             setState(() { _conciergeSubTab = '대여관리'; });
                           }),
                         ],
@@ -3048,44 +3050,80 @@ class _AdminScreenState extends State<AdminScreen> {
             if (products.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(8.0),
-                child: Text('등록된 상품이 없습니다.', style: TextStyle(color: Colors.grey)),
+                child: Text('등록된 물품이 없습니다.', style: TextStyle(color: Colors.grey)),
               )
-            else
-              ...products.map((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final name = data['name'] ?? '이름 없음';
-                final totalQuantity = data['totalQuantity'] ?? 0;
-                final inProgress = activeCounts[doc.id] ?? 0;
-                final available = totalQuantity > 0 ? (totalQuantity - inProgress) : 0;
-                
-                final isInfinite = totalQuantity == 0;
-                
-                return InkWell(
-                  onTap: onTapItem,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          flex: 4, 
-                          child: Text(name, style: const TextStyle(fontWeight: FontWeight.w500))
+            else ...[
+              // Header Row
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
+                child: Row(
+                  children: [
+                    const Expanded(flex: 5, child: Text('물품명', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                    Expanded(flex: 2, child: Text('전체', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDarkMode ? Colors.white70 : Colors.black87))),
+                    Expanded(flex: 2, child: Text('진행', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDarkMode ? Colors.white70 : Colors.black87))),
+                    Expanded(flex: 2, child: Text('재고', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDarkMode ? Colors.white70 : Colors.black87))),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 250), // limits height to allow scrolling
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
+                    final doc = products[index];
+                    final data = doc.data() as Map<String, dynamic>;
+                    final name = data['name'] ?? '이름 없음';
+                    final totalQuantity = data['totalQuantity'] ?? 0;
+                    final inProgress = activeCounts[doc.id] ?? 0;
+                    final available = totalQuantity > 0 ? (totalQuantity - inProgress) : 0;
+                    
+                    final isInfinite = totalQuantity == 0;
+
+                    return InkWell(
+                      onTap: onTapItem,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 5, 
+                              child: Text(name, style: const TextStyle(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)
+                            ),
+                            Expanded(
+                              flex: 2, 
+                              child: Text(
+                                isInfinite ? '∞' : '$totalQuantity',
+                                style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+                                textAlign: TextAlign.right,
+                              )
+                            ),
+                            Expanded(
+                              flex: 2, 
+                              child: Text(
+                                '$inProgress',
+                                style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+                                textAlign: TextAlign.right,
+                              )
+                            ),
+                            Expanded(
+                              flex: 2, 
+                              child: Text(
+                                isInfinite ? '∞' : '$available',
+                                style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+                                textAlign: TextAlign.right,
+                              )
+                            ),
+                          ],
                         ),
-                        Expanded(
-                          flex: 6, 
-                          child: Text(
-                            isInfinite 
-                              ? '진행중: $inProgress개 (무제한)'
-                              : '총 $totalQuantity개 | 진행중 $inProgress개 | 남음 $available개',
-                            style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87),
-                            textAlign: TextAlign.right,
-                          )
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),

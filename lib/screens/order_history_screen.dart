@@ -142,7 +142,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             itemCount: sortedOrders.length,
             itemBuilder: (context, index) {
               final order = sortedOrders[index];
-              final itemName = order.items.isNotEmpty ? order.items.first['name'] : '상품 없음';
+              final itemName = order.items.isNotEmpty ? order.items.first['name'] : '물품 없음';
               final extraCount = order.items.length > 1 ? ' 외 ${order.items.length - 1}건' : '';
               final displayName = '$itemName$extraCount';
 

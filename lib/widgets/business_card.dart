@@ -47,10 +47,10 @@ class BusinessCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         memCacheWidth: 200, // Optimize memory for thumbnails
                         maxWidthDiskCache: 400,
-                        placeholder: (context, url) => _buildPlaceholder(business.subCategory),
-                        errorWidget: (context, url, error) => _buildPlaceholder(business.subCategory),
+                        placeholder: (context, url) => _buildPlaceholder(context, business.subCategory),
+                        errorWidget: (context, url, error) => _buildPlaceholder(context, business.subCategory),
                       )
-                    : _buildPlaceholder(business.subCategory),
+                    : _buildPlaceholder(context, business.subCategory),
               ),
               const SizedBox(width: 16),
               // Details
@@ -146,8 +146,8 @@ class BusinessCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaceholder(String category) {
-    String assetPath = 'assets/images/logo.png'; // default
+  Widget _buildPlaceholder(BuildContext context, String category) {
+    String assetPath = (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'); // default
     if (category.contains('쇼핑')) assetPath = 'assets/images/ph_shopping.png';
     else if (category.contains('식당') || category.contains('음식')) assetPath = 'assets/images/ph_restaurant.png';
     else if (category.contains('카페')) assetPath = 'assets/images/ph_cafebar.png';

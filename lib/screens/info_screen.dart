@@ -168,7 +168,7 @@ class _InfoScreenState extends State<InfoScreen> {
               child: GestureDetector(
                 onTap: widget.onNavigateHome,
                 child: Image.asset(
-                  'assets/images/logo.png',
+                  (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
                   height: 32,
                   errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
                 ),

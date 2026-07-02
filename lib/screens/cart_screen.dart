@@ -34,6 +34,7 @@ class _CartScreenState extends State<CartScreen> {
         'endDate': item.endDate?.toIso8601String(),
         'rentalDays': item.rentalDays,
         'totalPriceKrw': item.totalPriceKrw,
+        'isBankTransferOnly': item.product.isBankTransferOnly,
       }).toList(),
     };
 
@@ -125,9 +126,15 @@ class _CartScreenState extends State<CartScreen> {
                                         style: TextStyle(color: Colors.grey[600], fontSize: 12),
                                       ),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      '₩${currencyFormatter.format(item.totalPriceKrw)}',
-                                      style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.savings_outlined, color: Colors.blueAccent, size: 16),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          currencyFormatter.format(item.totalPriceKrw),
+                                          style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -170,9 +177,15 @@ class _CartScreenState extends State<CartScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text(
-                                '₩${currencyFormatter.format(cart.totalPriceKrw)}',
-                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                              Row(
+                                children: [
+                                  const Icon(Icons.savings_outlined, color: Colors.redAccent, size: 24),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    currencyFormatter.format(cart.totalPriceKrw),
+                                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

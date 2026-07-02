@@ -299,7 +299,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         title: Row(
           children: [
             Image.asset(
-              'assets/images/logo.png',
+              (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
               height: 32,
               errorBuilder: (context, error, stackTrace) => Icon(Icons.person, color: isDarkMode ? Colors.white : Colors.black),
             ),

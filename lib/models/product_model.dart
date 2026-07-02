@@ -7,6 +7,7 @@ class Product {
   final String stockStatus; // e.g., 'in_stock', 'out_of_stock'
   final String imageUrl;
   final String description;
+  final bool isBankTransferOnly;
 
   Product({
     required this.id,
@@ -17,6 +18,7 @@ class Product {
     required this.stockStatus,
     required this.imageUrl,
     required this.description,
+    this.isBankTransferOnly = false,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class Product {
       stockStatus: json['stockStatus'] ?? 'in_stock',
       imageUrl: json['imageUrl'] ?? '',
       description: json['description'] ?? '',
+      isBankTransferOnly: json['isBankTransferOnly'] ?? false,
     );
   }
 
@@ -42,6 +45,7 @@ class Product {
       'stockStatus': stockStatus,
       'imageUrl': imageUrl,
       'description': description,
+      'isBankTransferOnly': isBankTransferOnly,
     };
   }
 }

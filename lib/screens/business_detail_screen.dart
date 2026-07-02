@@ -406,7 +406,7 @@ class _BusinessDetailScreenContent extends StatelessWidget {
                     errorWidget: (context, url, error) => Container(
                       color: isDarkMode ? Colors.black : Colors.white,
                       child: Image.asset(
-                        _getPlaceholderImage(business.subCategory),
+                        _getPlaceholderImage(context, business.subCategory),
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
@@ -425,7 +425,7 @@ class _BusinessDetailScreenContent extends StatelessWidget {
                   child: Container(
                     color: isDarkMode ? Colors.black : Colors.white,
                     child: Image.asset(
-                      _getPlaceholderImage(business.subCategory),
+                      _getPlaceholderImage(context, business.subCategory),
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) => Container(
                         color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
@@ -591,8 +591,8 @@ class _BusinessDetailScreenContent extends StatelessWidget {
     );
   }
 
-  String _getPlaceholderImage(String category) {
-    String assetPath = 'assets/images/logo.png'; // default
+  String _getPlaceholderImage(BuildContext context, String category) {
+    String assetPath = (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'); // default
     if (category.contains('쇼핑')) assetPath = 'assets/images/ph_shopping.png';
     else if (category.contains('식당') || category.contains('음식')) assetPath = 'assets/images/ph_restaurant.png';
     else if (category.contains('카페')) assetPath = 'assets/images/ph_cafebar.png';

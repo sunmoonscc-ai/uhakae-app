@@ -39,7 +39,7 @@ class HomeScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Image.asset(
-                        'assets/images/logo.png',
+                        (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
                         height: 40,
                         errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
                       ),
@@ -379,7 +379,7 @@ class _FavoriteListSectionState extends State<_FavoriteListSection> {
   }
 
   String _getPlaceholderImage(String category) {
-    String assetPath = 'assets/images/logo.png'; // default
+    String assetPath = (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'); // default
     if (category.contains('쇼핑')) assetPath = 'assets/images/ph_shopping.png';
     else if (category.contains('식당') || category.contains('음식')) assetPath = 'assets/images/ph_restaurant.png';
     else if (category.contains('카페')) assetPath = 'assets/images/ph_cafebar.png';
