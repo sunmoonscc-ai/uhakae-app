@@ -55,12 +55,23 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
             ),
             const Divider(),
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('point_history')
-                    .where('userId', isEqualTo: user.uid)
-                    .snapshots(),
-                builder: (context, snapshot) {
+              child: FutureBuilder<QuerySnapshot>(
+                future: FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).get(),
+                builder: (context, userSnap) {
+                  if (userSnap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (!userSnap.hasData || userSnap.data!.docs.isEmpty) {
+                    return Center(child: Text('사용자 정보를 찾을 수 없습니다.', style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54)));
+                  }
+                  final userDocId = userSnap.data!.docs.first.id;
+
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('point_history')
+                        .where('userId', isEqualTo: userDocId)
+                        .snapshots(),
+                    builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
@@ -197,8 +208,10 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                     ),
                   );
                 },
-              ),
+              );
+              },
             ),
+          ),
           ],
         ),
       ),

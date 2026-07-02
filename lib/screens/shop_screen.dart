@@ -91,7 +91,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                             ? FirebaseFirestore.instance
                                 .collection('orders')
                                 .where('userId', isEqualTo: user.uid)
-                                .where('status', isEqualTo: 'pending')
+                                .where('status', whereIn: ['pending', 'approved'])
                                 .limit(1)
                                 .snapshots()
                             : null,

@@ -35,6 +35,11 @@ class AdminShopManagementTab extends StatefulWidget {
 class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
   final OrderService _orderService = OrderService();
   String _selectedStatusFilter = 'pending';
+  final Map<String, bool> _expandedState = {};
+  String _filterDate = '';
+  String _filterSchool = '전체';
+  String _filterUser = '전체';
+
 
   @override
   void initState() {
@@ -240,7 +245,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
           title: const Text('상태 강제 변경 (오류 수정용)'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            children: ['pending', 'approved', 'preparing', 'shipping', 'delivered', 'completed', 'not_received', 'rejected'].map((status) {
+            children: ['pending', 'approved', 'preparing', 'shipping', 'delivered', 'receipt_confirmed', 'completed', 'not_received', 'rejected'].map((status) {
               return ListTile(
                 title: Text(_getStatusText(status)),
                 onTap: () async {
@@ -265,6 +270,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
       case 'shipping': return '배송중';
       case 'completed': return '완료';
       case 'delivered': return '배송완료 (완료 대기)';
+      case 'receipt_confirmed': return '수령완료';
       case 'not_received': return '미수령 신고';
       case 'rejected': return '거절됨';
       default: return status;
@@ -274,8 +280,8 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
   List<OrderGroup> _groupOrders(List<OrderModel> orders) {
     final Map<String, OrderGroup> groups = {};
     for (var order in orders) {
-      final dateStr = DateFormat('yyyy-MM-dd').format(order.createdAt);
-      final key = '${order.userId}_$dateStr';
+      final dateStr = DateFormat('yyyy-MM-dd HH:mm').format(order.createdAt);
+      final key = order.id;
       if (groups.containsKey(key)) {
         groups[key]!.orders.add(order);
       } else {
@@ -293,6 +299,92 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
     return result;
   }
 
+  Future<void> _pickDateFilter() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        int selectedYear = DateTime.now().year;
+        int selectedMonth = DateTime.now().month;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('날짜/월 검색'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('특정 월(Month)로 검색'),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      DropdownButton<int>(
+                        value: selectedYear,
+                        items: List.generate(10, (i) => 2024 + i).map((y) => DropdownMenuItem(value: y, child: Text('$y년'))).toList(),
+                        onChanged: (v) => setDialogState(() => selectedYear = v!),
+                      ),
+                      const SizedBox(width: 16),
+                      DropdownButton<int>(
+                        value: selectedMonth,
+                        items: List.generate(12, (i) => i + 1).map((m) => DropdownMenuItem(value: m, child: Text('$m월'))).toList(),
+                        onChanged: (v) => setDialogState(() => selectedMonth = v!),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      final monthStr = selectedMonth.toString().padLeft(2, '0');
+                      Navigator.pop(context, '$selectedYear-$monthStr');
+                    },
+                    child: const Text('월(Month) 단위로 검색하기'),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(),
+                  ),
+                  const Text('특정 일(Date)로 검색'),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () async {
+                      final DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2101),
+                      );
+                      if (picked != null) {
+                        if (context.mounted) Navigator.pop(context, DateFormat('yyyy-MM-dd').format(picked));
+                      }
+                    },
+                    child: const Text('일(Date) 달력 열기'),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, 'CLEAR'),
+                  child: const Text('초기화', style: TextStyle(color: Colors.red)),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('취소'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      if (result == 'CLEAR') {
+        setState(() => _filterDate = '');
+      } else {
+        setState(() => _filterDate = result);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<OrderModel>>(
@@ -305,10 +397,26 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
         
         final allOrders = snapshot.data ?? [];
 
+        // 계산: 진행 중인 물품 수량 (재고 파악용)
+        Map<String, int> activeCounts = {};
+        for (var order in allOrders) {
+          if (['pending', 'approved', 'preparing', 'shipping', 'delivered', 'not_received', 'receipt_confirmed'].contains(order.status)) {
+            for (var item in order.items) {
+              final itemId = item['productId'];
+              final qty = item['quantity'] ?? 1;
+              if (itemId != null) {
+                activeCounts[itemId] = (activeCounts[itemId] ?? 0) + (qty as int);
+              }
+            }
+          }
+        }
+
         int getStatusCount(String status) {
           var filtered = allOrders;
           if (status == 'completed') {
-            filtered = filtered.where((o) => ['completed', 'delivered', 'not_received', 'rejected'].contains(o.status)).toList();
+            filtered = filtered.where((o) => ['completed', 'rejected'].contains(o.status)).toList();
+          } else if (status == 'shipping') {
+            filtered = filtered.where((o) => ['shipping', 'delivered', 'not_received', 'receipt_confirmed'].contains(o.status)).toList();
           } else {
             filtered = filtered.where((o) => o.status == status).toList();
           }
@@ -317,7 +425,9 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
 
         var displayOrders = allOrders;
         if (_selectedStatusFilter == 'completed') {
-          displayOrders = displayOrders.where((o) => ['completed', 'delivered', 'not_received', 'rejected'].contains(o.status)).toList();
+          displayOrders = displayOrders.where((o) => ['completed', 'rejected'].contains(o.status)).toList();
+        } else if (_selectedStatusFilter == 'shipping') {
+          displayOrders = displayOrders.where((o) => ['shipping', 'delivered', 'not_received', 'receipt_confirmed'].contains(o.status)).toList();
         } else {
           displayOrders = displayOrders.where((o) => o.status == _selectedStatusFilter).toList();
         }
@@ -377,15 +487,142 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                 }).toList(),
               ),
             ),
+            // 검색 필터
+            Builder(
+              builder: (context) {
+                final Set<String> availableSchools = {'전체'};
+                final Set<String> availableUsers = {'전체'};
+                for (var group in displayGroups) {
+                  if (group.userSchool != null && group.userSchool!.isNotEmpty) availableSchools.add(group.userSchool!);
+                  final name = group.userName ?? group.userId.substring(0, 5);
+                  if (name.isNotEmpty) availableUsers.add(name);
+                }
+
+                String currentSchoolFilter = availableSchools.contains(_filterSchool) ? _filterSchool : '전체';
+                String currentUserFilter = availableUsers.contains(_filterUser) ? _filterUser : '전체';
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: _pickDateFilter,
+                          child: Container(
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(child: Text(_filterDate.isEmpty ? '날짜 전체' : _filterDate, overflow: TextOverflow.ellipsis)),
+                                const Icon(Icons.calendar_today, size: 16),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: currentSchoolFilter,
+                              hint: const Text('어학원 검색'),
+                              onChanged: (String? newValue) {
+                                if (newValue != null) {
+                                  setState(() {
+                                    _filterSchool = newValue;
+                                  });
+                                }
+                              },
+                              items: availableSchools.map<DropdownMenuItem<String>>((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(value, overflow: TextOverflow.ellipsis),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: currentUserFilter,
+                              hint: const Text('사용자 검색'),
+                              onChanged: (String? newValue) {
+                                if (newValue != null) {
+                                  setState(() {
+                                    _filterUser = newValue;
+                                  });
+                                }
+                              },
+                              items: availableUsers.map<DropdownMenuItem<String>>((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(value, overflow: TextOverflow.ellipsis),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            ),
+            const SizedBox(height: 8),
             // 리스트
             Expanded(
-              child: displayGroups.isEmpty
-                  ? const Center(child: Text('주문이 없습니다.'))
-                  : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: displayGroups.length,
-                itemBuilder: (context, index) {
-                  final group = displayGroups[index];
+              child: () {
+                // 필터 적용
+                var filteredGroups = displayGroups.where((group) {
+                  if (_filterDate.isNotEmpty && !group.dateStr.contains(_filterDate)) return false;
+                  
+                  final currentSchoolFilter = _filterSchool.isEmpty ? '전체' : _filterSchool;
+                  if (currentSchoolFilter != '전체' && (group.userSchool ?? '') != currentSchoolFilter) return false;
+                  
+                  final currentUserFilter = _filterUser.isEmpty ? '전체' : _filterUser;
+                  final name = group.userName ?? group.userId.substring(0, 5);
+                  if (currentUserFilter != '전체' && name != currentUserFilter) return false;
+                  
+                  return true;
+                }).toList();
+
+                if (filteredGroups.isEmpty) {
+                  return const Center(child: Text('주문이 없습니다.'));
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredGroups.length,
+                  itemBuilder: (context, index) {
+                    final group = filteredGroups[index];
+                    
+                    final groupKey = group.orders.isNotEmpty ? group.orders.first.id : '${group.userId}_${group.dateStr}';
+                  final bool isCompletedTab = _selectedStatusFilter == 'completed';
+                  final bool isExpanded = _expandedState[groupKey] ?? !isCompletedTab;
                   
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
@@ -410,35 +647,58 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                             children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Expanded(
-                                child: Text(
-                                  '${group.dateStr} / ${group.userSchool ?? '어학원 미상'} / ${group.userName ?? group.userId.substring(0, 5)}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                child: InkWell(
+                                  onTap: isCompletedTab ? () {
+                                    setState(() {
+                                      _expandedState[groupKey] = !isExpanded;
+                                    });
+                                  } : null,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '날짜: ${group.dateStr} / 어학원: ${group.userSchool ?? '미상'} / 사용자: ${group.userName ?? group.userId.substring(0, 5)}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                          ),
+                                        ),
+                                        if (isCompletedTab)
+                                          Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, size: 20, color: Colors.grey),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               InkWell(
                                 onTap: () => _showStatusOverrideDialog(group),
-                                borderRadius: BorderRadius.circular(16),
-                                child: Chip(
-                                  label: Row(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[50],
+                                    border: Border.all(color: Colors.black87),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text(_getStatusText(group.status), style: const TextStyle(fontSize: 12)),
-                                      const SizedBox(width: 2),
-                                      const Icon(Icons.arrow_drop_down, size: 16),
+                                      Text(_getStatusText(group.status), style: const TextStyle(fontSize: 11)),
+                                      const Icon(Icons.arrow_drop_down, size: 14),
                                     ],
                                   ),
-                                  backgroundColor: Colors.blue[50],
                                 ),
                               ),
                             ],
                           ),
-                          const Divider(),
-                          
-                          // 모든 주문의 아이템 나열
+                          if (isExpanded) ...[
+                            const Divider(),
+                            
+                            // 모든 주문의 아이템 나열
                           ...group.orders.expand((order) {
                             return order.items.asMap().entries.map((entry) {
                               final itemIndex = entry.key;
@@ -460,14 +720,38 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                                 );
                               }
 
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      flex: 2,
-                                      child: Text('- ${item['name']} x ${item['quantity']}')
-                                    ),
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 2,
+                                          child: item['type'] == 'rent' && item['productId'] != null
+                                              ? FutureBuilder<DocumentSnapshot>(
+                                                  future: FirebaseFirestore.instance.collection('shop_items').doc(item['productId']).get(),
+                                                  builder: (context, snapshot) {
+                                                    String stockText = '';
+                                                    if (snapshot.hasData && snapshot.data!.exists) {
+                                                      final data = snapshot.data!.data() as Map<String, dynamic>;
+                                                      final totalQuantity = data['totalQuantity'] ?? 0;
+                                                      if (totalQuantity > 0) {
+                                                        final inProgress = activeCounts[item['productId']] ?? 0;
+                                                        final available = totalQuantity - inProgress;
+                                                        stockText = ' (재고: $available)';
+                                                      } else {
+                                                        stockText = ' (재고: ∞)';
+                                                      }
+                                                    }
+                                                    return Text('- ${item['name']} x ${item['quantity']}$stockText',
+                                                      style: TextStyle(
+                                                        color: stockText.contains('재고: -') ? Colors.red : null,
+                                                        fontWeight: stockText.contains('재고: -') ? FontWeight.bold : FontWeight.normal,
+                                                      ),
+                                                    );
+                                                  },
+                                                )
+                                              : Text('- ${item['name']} x ${item['quantity']}'),
+                                        ),
                                     Expanded(
                                       flex: 1,
                                       child: Padding(
@@ -562,6 +846,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                           
                           // 상태별 액션 버튼 (그룹)
                           _buildActionButtonsWidget(group, userPoints, userDocId),
+                          ],
                         ],
                       ),
                     );
@@ -569,7 +854,8 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                 ),
               );
                 },
-              ),
+              );
+              }(),
             ),
           ],
         );
@@ -703,6 +989,19 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
           Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: OutlinedButton(
             onPressed: () => _showGroupRejectDialog(group),
             child: const Text('주문 취소'),
+          ))),
+        ],
+      );
+    } else if (group.status == 'receipt_confirmed') {
+      return Row(
+        children: [
+          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: ElevatedButton(
+            onPressed: () async {
+              for (var order in group.orders) {
+                await _orderService.updateOrderStatusByAdmin(order.id, 'completed');
+              }
+            },
+            child: const Text('최종 완료'),
           ))),
         ],
       );

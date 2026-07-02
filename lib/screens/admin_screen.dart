@@ -2952,10 +2952,10 @@ class _AdminScreenState extends State<AdminScreen> {
                   if (status == 'pending') pending++;
                   else if (status == 'approved') approved++;
                   else if (status == 'preparing') preparing++;
-                  else if (status == 'shipping') shipping++;
-                  else if (status == 'completed' || status == 'delivered' || status == 'returned') completed++;
+                  else if (['shipping', 'delivered', 'not_received', 'receipt_confirmed'].contains(status)) shipping++;
+                  else if (['completed', 'rejected'].contains(status)) completed++;
 
-                  if (['pending', 'approved', 'preparing', 'shipping'].contains(status)) {
+                  if (['pending', 'approved', 'preparing', 'shipping', 'delivered', 'not_received', 'receipt_confirmed'].contains(status)) {
                     final items = data['items'] as List<dynamic>? ?? [];
                     for (var item in items) {
                       final itemId = item['productId'];
@@ -3039,94 +3039,162 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _buildProductListCard(String title, List<QueryDocumentSnapshot> products, Map<String, int> activeCounts, bool isDarkMode, {VoidCallback? onTapItem}) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const Divider(),
-            if (products.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: Text('등록된 물품이 없습니다.', style: TextStyle(color: Colors.grey)),
-              )
-            else ...[
-              // Header Row
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
-                child: Row(
-                  children: [
-                    const Expanded(flex: 5, child: Text('물품명', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                    Expanded(flex: 2, child: Text('전체', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDarkMode ? Colors.white70 : Colors.black87))),
-                    Expanded(flex: 2, child: Text('진행', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDarkMode ? Colors.white70 : Colors.black87))),
-                    Expanded(flex: 2, child: Text('재고', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDarkMode ? Colors.white70 : Colors.black87))),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Container(
-                constraints: const BoxConstraints(maxHeight: 250), // limits height to allow scrolling
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    final doc = products[index];
-                    final data = doc.data() as Map<String, dynamic>;
-                    final name = data['name'] ?? '이름 없음';
-                    final totalQuantity = data['totalQuantity'] ?? 0;
-                    final inProgress = activeCounts[doc.id] ?? 0;
-                    final available = totalQuantity > 0 ? (totalQuantity - inProgress) : 0;
-                    
-                    final isInfinite = totalQuantity == 0;
+    String sortColumn = '물품명';
+    bool sortAscending = true;
 
-                    return InkWell(
-                      onTap: onTapItem,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 5, 
-                              child: Text(name, style: const TextStyle(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)
-                            ),
-                            Expanded(
-                              flex: 2, 
-                              child: Text(
-                                isInfinite ? '∞' : '$totalQuantity',
-                                style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
-                                textAlign: TextAlign.right,
-                              )
-                            ),
-                            Expanded(
-                              flex: 2, 
-                              child: Text(
-                                '$inProgress',
-                                style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
-                                textAlign: TextAlign.right,
-                              )
-                            ),
-                            Expanded(
-                              flex: 2, 
-                              child: Text(
-                                isInfinite ? '∞' : '$available',
-                                style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
-                                textAlign: TextAlign.right,
-                              )
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+    return StatefulBuilder(
+      builder: (context, setState) {
+        final sortedProducts = List<QueryDocumentSnapshot>.from(products);
+        sortedProducts.sort((a, b) {
+          final dataA = a.data() as Map<String, dynamic>;
+          final dataB = b.data() as Map<String, dynamic>;
+          final nameA = dataA['name'] ?? '이름 없음';
+          final nameB = dataB['name'] ?? '이름 없음';
+          final totalA = dataA['totalQuantity'] ?? 0;
+          final totalB = dataB['totalQuantity'] ?? 0;
+          final progA = activeCounts[a.id] ?? 0;
+          final progB = activeCounts[b.id] ?? 0;
+          final availA = totalA > 0 ? (totalA - progA) : 0;
+          final availB = totalB > 0 ? (totalB - progB) : 0;
+          
+          int cmp = 0;
+          if (sortColumn == '물품명') cmp = nameA.compareTo(nameB);
+          else if (sortColumn == '전체') cmp = totalA.compareTo(totalB);
+          else if (sortColumn == '진행') cmp = progA.compareTo(progB);
+          else if (sortColumn == '재고') cmp = availA.compareTo(availB);
+          
+          return sortAscending ? cmp : -cmp;
+        });
+
+        Widget buildHeader(String label, int flex, {TextAlign align = TextAlign.left}) {
+          final isSelected = sortColumn == label;
+          return Expanded(
+            flex: flex,
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  if (sortColumn == label) {
+                    sortAscending = !sortAscending;
+                  } else {
+                    sortColumn = label;
+                    sortAscending = true;
+                  }
+                });
+              },
+              child: Row(
+                mainAxisAlignment: align == TextAlign.right ? MainAxisAlignment.end : MainAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDarkMode ? Colors.white70 : Colors.black87)),
+                  if (isSelected) Icon(sortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 14),
+                  if (!isSelected) const SizedBox(width: 14), // placeholder for alignment
+                ],
               ),
-            ],
-          ],
-        ),
-      ),
+            ),
+          );
+        }
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Divider(),
+                if (products.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text('등록된 물품이 없습니다.', style: TextStyle(color: Colors.grey)),
+                  )
+                else ...[
+                  // Header Row
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
+                    child: Row(
+                      children: [
+                        buildHeader('물품명', 5),
+                        buildHeader('전체', 2, align: TextAlign.right),
+                        buildHeader('진행', 2, align: TextAlign.right),
+                        buildHeader('재고', 2, align: TextAlign.right),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 250), // limits height to allow scrolling
+                    child: Scrollbar(
+                      thumbVisibility: true,
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: sortedProducts.length,
+                        itemBuilder: (context, index) {
+                          final doc = sortedProducts[index];
+                          final data = doc.data() as Map<String, dynamic>;
+                          final name = data['name'] ?? '이름 없음';
+                          final totalQuantity = data['totalQuantity'] ?? 0;
+                          final inProgress = activeCounts[doc.id] ?? 0;
+                          final available = totalQuantity > 0 ? (totalQuantity - inProgress) : 0;
+                          
+                          final isInfinite = totalQuantity == 0;
+
+                          return InkWell(
+                            onTap: onTapItem,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 5, 
+                                    child: Text(name, style: const TextStyle(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)
+                                  ),
+                                  Expanded(
+                                    flex: 2, 
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 14.0),
+                                      child: Text(
+                                        isInfinite ? '∞' : '$totalQuantity',
+                                        style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+                                        textAlign: TextAlign.right,
+                                      ),
+                                    )
+                                  ),
+                                  Expanded(
+                                    flex: 2, 
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 14.0),
+                                      child: Text(
+                                        '$inProgress',
+                                        style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+                                        textAlign: TextAlign.right,
+                                      ),
+                                    )
+                                  ),
+                                  Expanded(
+                                    flex: 2, 
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 14.0),
+                                      child: Text(
+                                        isInfinite ? '∞' : '$available',
+                                        style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+                                        textAlign: TextAlign.right,
+                                      ),
+                                    )
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      }
     );
   }
 

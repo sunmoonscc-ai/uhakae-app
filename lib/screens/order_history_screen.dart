@@ -21,6 +21,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       case 'preparing': return '배송 준비중';
       case 'shipping': return '배송중';
       case 'delivered': return '배송 완료';
+      case 'receipt_confirmed': return '수령 완료';
       case 'completed': return '수령/대여 완료';
       case 'not_received': return '미수령 확인중';
       default: return '알 수 없음';
@@ -35,6 +36,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       case 'preparing': return Colors.amber;
       case 'shipping': return Colors.purple;
       case 'delivered': return Colors.green;
+      case 'receipt_confirmed': return Colors.teal;
       case 'completed': return Colors.grey;
       case 'not_received': return Colors.redAccent;
       default: return Colors.black;
@@ -81,8 +83,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               return const Center(child: Text('주문 내역이 없습니다.'));
             }
 
-            final inProgressOrders = orders.where((o) => !['completed', 'delivered', 'not_received', 'rejected'].contains(o.status)).toList();
-            final completedOrders = orders.where((o) => ['completed', 'delivered', 'not_received', 'rejected'].contains(o.status)).toList();
+            final inProgressOrders = orders.where((o) => !['completed', 'rejected'].contains(o.status)).toList();
+            final completedOrders = orders.where((o) => ['completed', 'rejected'].contains(o.status)).toList();
 
             return TabBarView(
               children: [
@@ -142,17 +144,26 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             itemCount: sortedOrders.length,
             itemBuilder: (context, index) {
               final order = sortedOrders[index];
-              final itemName = order.items.isNotEmpty ? order.items.first['name'] : '물품 없음';
-              final extraCount = order.items.length > 1 ? ' 외 ${order.items.length - 1}건' : '';
-              final displayName = '$itemName$extraCount';
-
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                child: ListTile(
+                child: Column(
+                  children: [
+                    ListTile(
                   onTap: () => _showOrderDetailsDialog(order),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  title: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: order.items.map<Widget>((item) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4.0),
+                        child: Text(
+                          '${item['name']} x ${item['quantity']}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 4.0),
                     child: Text(dateFormat.format(order.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 12)),
@@ -172,6 +183,40 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                       ),
                     ],
                   ),
+                ),
+                if (order.status == 'delivered')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () {
+                            _orderService.updateOrderStatusByUser(order.id, 'not_received');
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: Size.zero,
+                          ),
+                          child: const Text('미수령 신고', style: TextStyle(fontSize: 12)),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            _orderService.updateOrderStatusByUser(order.id, 'receipt_confirmed');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: Size.zero,
+                          ),
+                          child: const Text('수령 완료', style: TextStyle(color: Colors.white, fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 ),
               );
             },
@@ -286,7 +331,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                           child: ElevatedButton(
                             onPressed: () {
                               Navigator.pop(context);
-                              _orderService.updateOrderStatusByUser(order.id, 'completed');
+                              _orderService.updateOrderStatusByUser(order.id, 'receipt_confirmed');
                             },
                             style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
                             child: const Text('수령 완료', style: TextStyle(color: Colors.white)),

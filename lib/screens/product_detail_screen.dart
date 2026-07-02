@@ -186,8 +186,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ? null
                 : () {
                     if (widget.product.type == 'rent' && (_startDate == null || _endDate == null)) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('대여 기간을 선택해주세요.')),
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          content: const Padding(
+                            padding: EdgeInsets.only(top: 8.0),
+                            child: Text('대여 기간을 선택해주세요.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('확인'),
+                            ),
+                          ],
+                        ),
                       );
                       return;
                     }
