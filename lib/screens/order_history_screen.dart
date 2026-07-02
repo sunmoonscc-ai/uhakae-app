@@ -147,77 +147,115 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                child: Column(
-                  children: [
-                    ListTile(
-                  onTap: () => _showOrderDetailsDialog(order),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  title: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: order.items.map<Widget>((item) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4.0),
-                        child: Text(
-                          '${item['name']} x ${item['quantity']}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: Text(dateFormat.format(order.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  ),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                child: Builder(builder: (context) {
+                  bool orderHasBankTransferOnly = false;
+                  for (var item in order.items) {
+                    if (item['isBankTransferOnly'] == true) {
+                      orderHasBankTransferOnly = true;
+                      break;
+                    }
+                  }
+
+                  return Column(
                     children: [
-                      Text(
-                        _getStatusText(order.status),
-                        style: TextStyle(color: _getStatusColor(order.status), fontSize: 12, fontWeight: FontWeight.bold),
+                      ListTile(
+                        onTap: () => _showOrderDetailsDialog(order),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        title: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: order.items.map<Widget>((item) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 4.0),
+                              child: Text(
+                                '${item['name']} x ${item['quantity']}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(dateFormat.format(order.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        ),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              _getStatusText(order.status),
+                              style: TextStyle(color: _getStatusColor(order.status), fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '₩${currencyFormatter.format(order.totalKrw)}',
+                              style: TextStyle(
+                                color: orderHasBankTransferOnly ? Colors.blue : Colors.redAccent, 
+                                fontWeight: FontWeight.bold, 
+                                fontSize: 13
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '₩${currencyFormatter.format(order.totalKrw)}',
-                        style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
+                      if (order.status == 'approved' && orderHasBankTransferOnly)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (order.isTransferNotified)
+                                const Text('송금 확인 대기중', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13))
+                              else
+                                ElevatedButton(
+                                  onPressed: () {
+                                    _orderService.notifyBankTransfer(order.id);
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('관리자에게 송금 완료 알림이 전송되었습니다.')));
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    minimumSize: Size.zero,
+                                  ),
+                                  child: const Text('계좌이체 완료 알림', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                ),
+                            ],
+                          ),
+                        ),
+                      if (order.status == 'delivered')
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              OutlinedButton(
+                                onPressed: () {
+                                  _orderService.updateOrderStatusByUser(order.id, 'not_received');
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  minimumSize: Size.zero,
+                                ),
+                                child: const Text('미수령 신고', style: TextStyle(fontSize: 12)),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: () {
+                                  _orderService.updateOrderStatusByUser(order.id, 'receipt_confirmed');
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  minimumSize: Size.zero,
+                                ),
+                                child: const Text('수령/대여 완료', style: TextStyle(color: Colors.white, fontSize: 12)),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
-                  ),
-                ),
-                if (order.status == 'delivered')
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(
-                          onPressed: () {
-                            _orderService.updateOrderStatusByUser(order.id, 'not_received');
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: Size.zero,
-                          ),
-                          child: const Text('미수령 신고', style: TextStyle(fontSize: 12)),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () {
-                            _orderService.updateOrderStatusByUser(order.id, 'receipt_confirmed');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: Size.zero,
-                          ),
-                          child: const Text('수령 완료', style: TextStyle(color: Colors.white, fontSize: 12)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                ),
+                  );
+                }),
               );
             },
           ),

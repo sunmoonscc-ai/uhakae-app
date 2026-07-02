@@ -156,6 +156,19 @@ class OrderService {
     }
   }
 
+  // 5.0 User notifies bank transfer completion
+  Future<bool> notifyBankTransfer(String orderId) async {
+    try {
+      await _firestore.collection('orders').doc(orderId).update({
+        'isTransferNotified': true,
+      });
+      return true;
+    } catch (e) {
+      print('Error notifying bank transfer: $e');
+      return false;
+    }
+  }
+
   // 5.1 Admin updates individual item status
   Future<bool> updateOrderItemStatusByAdmin(String orderId, int itemIndex, String newStatus, {String? rejectReason}) async {
     try {
@@ -285,7 +298,7 @@ class OrderService {
         for (int i = 0; i < items.length; i++) {
           final item = Map<String, dynamic>.from(items[i]);
           if (item['status'] == null || item['status'] == 'approved' || item['status'] == 'pending') {
-             item['status'] = 'preparing';
+             item['status'] = 'completed';
              if (item['isBankTransferOnly'] == true) {
                pointsToAdd += (item['totalPriceKrw'] ?? 0).toDouble();
              }
@@ -294,7 +307,7 @@ class OrderService {
           }
         }
 
-        final updates = <String, dynamic>{'status': 'preparing'};
+        final updates = <String, dynamic>{'status': 'completed'};
         if (itemsChanged) {
           updates['items'] = items;
         }

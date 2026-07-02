@@ -11,6 +11,7 @@ class OrderModel {
   final String status;
   final String? rejectReason;
   final DateTime createdAt;
+  final bool isTransferNotified;
 
   OrderModel({
     required this.id,
@@ -23,6 +24,7 @@ class OrderModel {
     required this.status,
     this.rejectReason,
     required this.createdAt,
+    this.isTransferNotified = false,
   });
 
   factory OrderModel.fromFirestore(DocumentSnapshot doc) {
@@ -38,6 +40,7 @@ class OrderModel {
       status: data['status'] ?? 'pending',
       rejectReason: data['rejectReason'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isTransferNotified: data['isTransferNotified'] ?? false,
     );
   }
 
@@ -52,6 +55,7 @@ class OrderModel {
       'status': status,
       'rejectReason': rejectReason,
       'createdAt': Timestamp.fromDate(createdAt),
+      'isTransferNotified': isTransferNotified,
     };
   }
 }

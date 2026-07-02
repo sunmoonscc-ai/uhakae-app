@@ -53,7 +53,6 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                 ),
               ],
             ),
-            const Divider(),
             Expanded(
               child: FutureBuilder<QuerySnapshot>(
                 future: FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).get(),
@@ -90,8 +89,24 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                       'createdAt': data['createdAt'] as Timestamp?,
                       'description': data['description'] ?? '',
                       'amount': (data['amount'] as num?)?.toDouble() ?? 0.0,
+                      'orderId': data['orderId'],
                     };
                   }).toList();
+
+                  // 1. Calculate running balance
+                  double currentPoints = (userSnap.data!.docs.first.data() as Map<String, dynamic>)['points']?.toDouble() ?? 0.0;
+                  
+                  history.sort((a, b) {
+                    final aTime = a['createdAt']?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
+                    final bTime = b['createdAt']?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
+                    return bTime.compareTo(aTime); // DESCENDING
+                  });
+
+                  double runningBalance = currentPoints;
+                  for (int i = 0; i < history.length; i++) {
+                    history[i]['balance'] = runningBalance;
+                    runningBalance -= history[i]['amount'];
+                  }
 
                   // 정렬 적용
                   history.sort((a, b) {
@@ -120,14 +135,21 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                   });
 
                   return SingleChildScrollView(
+                    primary: false,
                     scrollDirection: Axis.vertical,
                     child: SingleChildScrollView(
+                      primary: false,
                       scrollDirection: Axis.horizontal,
                       child: Theme(
                         data: Theme.of(context).copyWith(
                           iconTheme: IconThemeData(color: isDarkMode ? Colors.white70 : Colors.black87),
                         ),
                         child: DataTable(
+                          showCheckboxColumn: false,
+                          columnSpacing: 16.0,
+                          horizontalMargin: 12.0,
+                          dataRowMinHeight: 40.0,
+                          dataRowMaxHeight: 60.0,
                           sortColumnIndex: _sortColumnIndex,
                           sortAscending: _sortAscending,
                           headingRowColor: MaterialStateProperty.all(isDarkMode ? Colors.grey[800] : Colors.grey[100]),
@@ -151,7 +173,7 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                               },
                             ),
                             DataColumn(
-                              label: Text('수입', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+                              label: Text('+', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
                               numeric: true,
                               onSort: (columnIndex, ascending) {
                                 setState(() {
@@ -161,7 +183,17 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                               },
                             ),
                             DataColumn(
-                              label: Text('지출', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+                              label: Text('-', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+                              numeric: true,
+                              onSort: (columnIndex, ascending) {
+                                setState(() {
+                                  _sortColumnIndex = columnIndex;
+                                  _sortAscending = ascending;
+                                });
+                              },
+                            ),
+                            DataColumn(
+                              label: Icon(Icons.savings, size: 20, color: isDarkMode ? Colors.white : Colors.black),
                               numeric: true,
                               onSort: (columnIndex, ascending) {
                                 setState(() {
@@ -173,18 +205,54 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                           ],
                           rows: history.map((item) {
                             final date = item['createdAt']?.toDate();
-                            final dateStr = date != null ? DateFormat('yyyy.MM.dd HH:mm').format(date) : '날짜 없음';
+                            final dateStr = date != null ? DateFormat("MM.dd\nHH:mm").format(date) : "날짜\n없음";
                             final amount = item['amount'] as double;
+                            final balance = item['balance'] as double;
                             final isIncome = amount > 0;
                             final isExpense = amount < 0;
+                            
+                            String desc = item['description'] ?? '';
+                            if (desc.contains('계좌이체 확인') || desc.contains('포인트 충전')) {
+                              desc = '포인트 충전';
+                            } else if (desc.contains('대여')) {
+                              desc = '물품대여';
+                            } else if (desc.contains('포인트카드') || desc.contains('포인트 카드')) {
+                              desc = '포인트카드구매';
+                            } else if (desc.contains('구매') || desc.contains('결제') || desc.contains('주문')) {
+                              desc = '물품구매';
+                            } else {
+                              desc = desc; // keep original if none matches
+                            }
 
                             return DataRow(
+                              onSelectChanged: item['orderId'] != null 
+                                  ? (selected) => _showOrderDetails(context, item['orderId']) 
+                                  : null,
                               cells: [
-                                DataCell(Text(dateStr, style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87))),
-                                DataCell(Text(item['description'], style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87))),
                                 DataCell(
                                   Text(
-                                    isIncome ? NumberFormat('#,###').format(amount) : '-',
+                                    dateStr, 
+                                    style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87, fontSize: 11),
+                                  ),
+                                ),
+                                DataCell(
+                                  Container(
+                                    width: 80,
+                                    child: Text(
+                                      desc, 
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white70 : Colors.black87, 
+                                        fontSize: 12,
+                                      ),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      softWrap: true,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    isIncome ? NumberFormat('#,###').format(amount) : '',
                                     style: TextStyle(
                                       color: isIncome ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
                                       fontWeight: isIncome ? FontWeight.bold : FontWeight.normal,
@@ -193,10 +261,19 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                                 ),
                                 DataCell(
                                   Text(
-                                    isExpense ? NumberFormat('#,###').format(amount.abs()) : '-',
+                                    isExpense ? NumberFormat('#,###').format(amount.abs()) : '',
                                     style: TextStyle(
                                       color: isExpense ? Colors.red : (isDarkMode ? Colors.white70 : Colors.black87),
                                       fontWeight: isExpense ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    NumberFormat('#,###').format(balance),
+                                    style: TextStyle(
+                                      color: isDarkMode ? Colors.white : Colors.black,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
@@ -216,5 +293,50 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
         ),
       ),
     );
+  }
+
+  Future<void> _showOrderDetails(BuildContext context, String orderId) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('orders').doc(orderId).get();
+      if (!doc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('주문 정보를 찾을 수 없습니다.')));
+        return;
+      }
+      final data = doc.data() as Map<String, dynamic>;
+      final items = List<dynamic>.from(data['items'] ?? []);
+      
+      showDialog(
+        context: context,
+        builder: (context) {
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            title: const Text('주문 상세 내역', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: items.map((item) {
+                  final name = item['name'] ?? '';
+                  final quantity = item['quantity'] ?? 1;
+                  final price = item['totalPriceKrw'] ?? 0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Text('$name x $quantity\n₩${NumberFormat('#,###').format(price)}', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 14)),
+                  );
+                }).toList(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('닫기'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('오류가 발생했습니다: $e')));
+    }
   }
 }

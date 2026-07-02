@@ -242,7 +242,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('상태 강제 변경 (오류 수정용)'),
+          title: const Text('상태 변경'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: ['pending', 'approved', 'preparing', 'shipping', 'delivered', 'receipt_confirmed', 'completed', 'not_received', 'rejected'].map((status) {
@@ -881,6 +881,17 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
     } else if (group.status == 'approved') {
       final productIds = group.orders.expand((o) => o.items).map((i) => i['productId'] as String).toSet().toList();
       
+      bool orderHasBankTransferOnly = false;
+      for (var order in group.orders) {
+        for (var item in order.items) {
+          if (item['isBankTransferOnly'] == true) {
+            orderHasBankTransferOnly = true;
+            break;
+          }
+        }
+        if (orderHasBankTransferOnly) break;
+      }
+
       return FutureBuilder<QuerySnapshot>(
         future: FirebaseFirestore.instance.collection('products').where(FieldPath.documentId, whereIn: productIds.isNotEmpty ? productIds : ['dummy']).get(),
         builder: (context, snapshot) {
@@ -891,8 +902,8 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
             );
           }
           
-          bool hasBankTransferOnly = false;
-          if (snapshot.hasData) {
+          bool hasBankTransferOnly = orderHasBankTransferOnly;
+          if (snapshot.hasData && !hasBankTransferOnly) {
             for (var doc in snapshot.data!.docs) {
               if ((doc.data() as Map<String, dynamic>)['isBankTransferOnly'] == true) {
                 hasBankTransferOnly = true;
@@ -902,6 +913,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
           }
 
           final bool canPayWithPoints = userPoints >= group.totalKrw;
+          final bool isPointPaymentAllowed = !hasBankTransferOnly && canPayWithPoints && userDocId != null;
           
           return Row(
             children: [
@@ -924,8 +936,17 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                         },
                       );
                     },
-                    style: OutlinedButton.styleFrom(foregroundColor: Colors.black87),
-                    child: const Text('계좌이체확인됨'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: group.orders.any((o) => o.isTransferNotified) ? Colors.blue : Colors.black87,
+                      side: BorderSide(color: group.orders.any((o) => o.isTransferNotified) ? Colors.blue : Colors.grey),
+                    ),
+                    child: Text(
+                      group.orders.any((o) => o.isTransferNotified) ? '이체완료. 확인 필요' : '계좌이체확인됨',
+                      style: TextStyle(
+                        fontWeight: group.orders.any((o) => o.isTransferNotified) ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -933,7 +954,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
                   child: ElevatedButton(
-                    onPressed: (!hasBankTransferOnly && canPayWithPoints && userDocId != null) ? () => _handleGroupDeductPoints(group, userDocId) : null,
+                    onPressed: isPointPaymentAllowed ? () => _handleGroupDeductPoints(group, userDocId) : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
