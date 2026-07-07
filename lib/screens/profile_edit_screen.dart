@@ -1,4 +1,5 @@
 import 'package:study_abroad_app/utils/ui_utils.dart';
+import 'package:study_abroad_app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -300,10 +301,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.black),
         title: Row(
           children: [
-            Image.asset(
-              (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
-              height: 32,
-              errorBuilder: (context, error, stackTrace) => Icon(Icons.person, color: isDarkMode ? Colors.white : Colors.black),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const MainScreen()),
+                    (route) => false,
+                  );
+                },
+                child: Image.asset(
+                  (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
+                  height: 32,
+                  errorBuilder: (context, error, stackTrace) => Icon(Icons.person, color: isDarkMode ? Colors.white : Colors.black),
+                ),
+              ),
             ),
             const SizedBox(width: 8),
             Text(

@@ -21,9 +21,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       case 'preparing': return '배송 준비중';
       case 'shipping': return '배송중';
       case 'delivered': return '배송 완료';
-      case 'receipt_confirmed': return '수령 완료';
+      case 'not_received': return '미수령';
+      case 'receipt_confirmed': return '배송확인';
       case 'completed': return '수령/대여 완료';
-      case 'not_received': return '미수령 확인중';
       case 'canceled': return '주문 취소';
       default: return '알 수 없음';
     }
@@ -43,6 +43,13 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       case 'canceled': return Colors.red;
       default: return Colors.black;
     }
+  }
+
+  Color _getPointColor(BuildContext context, String status, bool isBankTransfer) {
+    if (status == 'rejected' || status == 'canceled') {
+      return Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black;
+    }
+    return isBankTransfer ? Colors.blue : Colors.redAccent;
   }
 
   @override
@@ -191,12 +198,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.savings, color: orderHasBankTransferOnly ? Colors.blue : Colors.redAccent, size: 16),
+                                Icon(Icons.savings, color: _getPointColor(context, order.status, orderHasBankTransferOnly), size: 16),
                                 const SizedBox(width: 2),
                                 Text(
                                   '${currencyFormatter.format(order.totalKrw)}',
                                   style: TextStyle(
-                                    color: orderHasBankTransferOnly ? Colors.blue : Colors.redAccent, 
+                                    color: _getPointColor(context, order.status, orderHasBankTransferOnly), 
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -274,7 +281,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   minimumSize: Size.zero,
                                 ),
-                                child: const Text('미수령 신고', style: TextStyle(fontSize: 12)),
+                                child: const Text('미수령', style: TextStyle(fontSize: 12)),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton(
@@ -286,7 +293,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   minimumSize: Size.zero,
                                 ),
-                                child: const Text('수령/대여 완료', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                child: const Text('배송확인', style: TextStyle(color: Colors.white, fontSize: 12)),
                               ),
                             ],
                           ),
@@ -305,6 +312,14 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   void _showOrderDetailsDialog(OrderModel order) {
     final currencyFormatter = NumberFormat('#,##0', 'en_US');
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
+
+    bool orderHasBankTransferOnly = false;
+    for (var item in order.items) {
+      if (item['isBankTransferOnly'] == true) {
+        orderHasBankTransferOnly = true;
+        break;
+      }
+    }
 
     showDialog(
       context: context,
@@ -376,12 +391,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.savings, color: Colors.redAccent, size: 20),
+                          Icon(Icons.savings, color: _getPointColor(context, order.status, orderHasBankTransferOnly), size: 20),
                           const SizedBox(width: 4),
                           Text(
                             '${currencyFormatter.format(order.totalKrw)}',
-                            style: const TextStyle(
-                              color: Colors.redAccent,
+                            style: TextStyle(
+                              color: _getPointColor(context, order.status, orderHasBankTransferOnly),
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
                             ),
@@ -413,7 +428,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                               _orderService.updateOrderStatusByUser(order.id, 'not_received');
                             },
                             style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                            child: const Text('미수령 신고'),
+                            child: const Text('미수령'),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -424,7 +439,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                               _orderService.updateOrderStatusByUser(order.id, 'receipt_confirmed');
                             },
                             style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                            child: const Text('수령 완료', style: TextStyle(color: Colors.white)),
+                            child: const Text('배송확인', style: TextStyle(color: Colors.white)),
                           ),
                         ),
                       ],

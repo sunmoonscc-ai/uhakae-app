@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../main.dart'; // To access themeNotifier
+import 'package:study_abroad_app/main.dart'; // To access themeNotifier
 import '../services/preferences_service.dart';
 import 'info_screen.dart';
 
@@ -21,14 +21,25 @@ class SettingsScreen extends StatelessWidget {
         ),
         title: Row(
           children: [
-            Image.asset(
-              (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
-              height: 32,
-              errorBuilder: (context, error, stackTrace) => Icon(
-                Icons.settings,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white
-                    : Colors.black,
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const MainScreen()),
+                    (route) => false,
+                  );
+                },
+                child: Image.asset(
+                  (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
+                  height: 32,
+                  errorBuilder: (context, error, stackTrace) => Icon(
+                    Icons.settings,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 8),

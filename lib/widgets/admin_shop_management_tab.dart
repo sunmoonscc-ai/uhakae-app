@@ -282,8 +282,8 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
       case 'shipping': return '배송중';
       case 'completed': return '완료';
       case 'delivered': return '배송완료 (완료 대기)';
-      case 'receipt_confirmed': return '수령완료';
-      case 'not_received': return '미수령 신고';
+      case 'receipt_confirmed': return '배송확인';
+      case 'not_received': return '미수령';
       case 'rejected': return '거절됨';
       default: return status;
     }
@@ -815,6 +815,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                                                 style: OutlinedButton.styleFrom(
                                                   padding: EdgeInsets.zero,
                                                   foregroundColor: Colors.red,
+                                                  side: const BorderSide(color: Colors.grey),
                                                 ),
                                                 child: const Text('거절', style: TextStyle(fontSize: 11)),
                                               ),
@@ -823,10 +824,12 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                                             SizedBox(
                                               width: 48,
                                               height: 28,
-                                              child: ElevatedButton(
+                                              child: OutlinedButton(
                                                 onPressed: () => _showItemApproveDialog(order, itemIndex),
-                                                style: ElevatedButton.styleFrom(
+                                                style: OutlinedButton.styleFrom(
                                                   padding: EdgeInsets.zero,
+                                                  foregroundColor: Colors.black,
+                                                  side: const BorderSide(color: Colors.black),
                                                 ),
                                                 child: const Text('승인', style: TextStyle(fontSize: 11)),
                                               ),
@@ -901,11 +904,18 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
         children: [
           Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: OutlinedButton(
             onPressed: () => _showGroupRejectDialog(group),
-            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red,
+              side: const BorderSide(color: Colors.grey),
+            ),
             child: const Text('전체 거절'),
           ))),
-          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: ElevatedButton(
+          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: OutlinedButton(
             onPressed: () => _showGroupApproveDialog(group),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.black,
+              side: const BorderSide(color: Colors.black),
+            ),
             child: const Text('전체 승인'),
           ))),
         ],
@@ -1054,7 +1064,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                 await _orderService.updateOrderStatusByAdmin(order.id, 'completed');
               }
             },
-            child: const Text('최종 완료'),
+            child: const Text('처리완료'),
           ))),
         ],
       );

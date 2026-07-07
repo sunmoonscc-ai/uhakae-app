@@ -11,6 +11,7 @@ import 'info_screen.dart';
 import '../services/preferences_service.dart';
 import '../widgets/admin_notification_badge.dart';
 
+import 'package:study_abroad_app/main.dart';
 import '../models/business_model.dart';
 import 'business_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -42,10 +43,21 @@ class HomeScreen extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset(
-                      (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
-                      height: 40,
-                      errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                            MaterialPageRoute(builder: (context) => const MainScreen()),
+                            (route) => false,
+                          );
+                        },
+                        child: Image.asset(
+                          (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
+                          height: 40,
+                          errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
+                        ),
+                      ),
                     ),
                   ],
                 ),

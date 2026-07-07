@@ -197,7 +197,7 @@ class OrderService {
 
         transaction.update(orderRef, updates);
 
-        if (newStatus == 'rejected' && currentStatus != 'pending' && currentStatus != 'rejected') {
+        if (newStatus == 'rejected' && currentStatus != 'rejected' && currentStatus != 'canceled') {
           // Calculate how much was paid with points
           double refundKrw = 0;
           for (var item in items) {
@@ -305,6 +305,23 @@ class OrderService {
         if (newStatus == 'rejected') {
           final priceKrw = (item['totalPriceKrw'] ?? 0).toDouble();
           newTotalKrw -= priceKrw;
+
+          if (item['isBankTransferOnly'] != true && priceKrw > 0 && userDocId != null) {
+            final userRef = _firestore.collection('users').doc(userDocId);
+            transaction.update(userRef, {
+              'points': FieldValue.increment(priceKrw),
+            });
+            
+            final historyRef = _firestore.collection('point_history').doc();
+            transaction.set(historyRef, {
+              'userId': userDocId,
+              'amount': priceKrw,
+              'type': 'order_refund',
+              'description': '부분 거절로 인한 포인트 환불',
+              'orderId': orderId,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+          }
         }
 
         bool allProcessed = true;

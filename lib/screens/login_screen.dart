@@ -174,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   );
 
               if (formData != null) {
-                await FirebaseFirestore.instance.collection('users').add({
+                await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
                   'email': user.email,
                   'name': formData['name'],
                   'phone_kr': formData['phone_kr'],
@@ -182,6 +182,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   'start_date': formData['start_date'],
                   'level': '예비',
                   'created_at': FieldValue.serverTimestamp(),
+                  'points': 1000,
+                });
+
+                await FirebaseFirestore.instance.collection('point_history').add({
+                  'userId': user.uid,
+                  'amount': 1000,
+                  'type': 'signup_bonus',
+                  'description': '가입 축하금',
+                  'createdAt': FieldValue.serverTimestamp(),
                 });
 
                 if (mounted) {

@@ -21,6 +21,7 @@ import '../services/preferences_service.dart';
 import '../widgets/admin_point_management_dialog.dart';
 import '../utils/admin_notification_manager.dart';
 import 'dart:async';
+import 'package:study_abroad_app/main.dart';
 
 class AdminScreen extends StatefulWidget {
   final String? initialTab;
@@ -858,10 +859,21 @@ class _AdminScreenState extends State<AdminScreen> {
         iconTheme: IconThemeData(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
         title: Row(
           children: [
-            Image.asset(
-              isDarkMode ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
-              height: 32,
-              errorBuilder: (context, error, stackTrace) => Icon(Icons.admin_panel_settings, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const MainScreen()),
+                    (route) => false,
+                  );
+                },
+                child: Image.asset(
+                  isDarkMode ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
+                  height: 32,
+                  errorBuilder: (context, error, stackTrace) => Icon(Icons.admin_panel_settings, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                ),
+              ),
             ),
             const SizedBox(width: 8),
             Text(

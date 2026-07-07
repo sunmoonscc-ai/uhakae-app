@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import 'dart:async';
+import 'package:study_abroad_app/main.dart';
 import 'post_write_screen.dart';
 import 'post_detail_screen.dart';
 import '../utils/ui_utils.dart';
@@ -132,10 +133,21 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
         elevation: 0,
         title: Row(
           children: [
-            Image.asset(
-              (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
-              height: 28,
-              errorBuilder: (context, error, stackTrace) => Icon(Icons.forum, color: isDarkMode ? Colors.white : Colors.black),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const MainScreen()),
+                    (route) => false,
+                  );
+                },
+                child: Image.asset(
+                  (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
+                  height: 28,
+                  errorBuilder: (context, error, stackTrace) => Icon(Icons.forum, color: isDarkMode ? Colors.white : Colors.black),
+                ),
+              ),
             ),
             const SizedBox(width: 8),
             Text(
