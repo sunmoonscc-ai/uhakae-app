@@ -251,10 +251,10 @@ class _FavoriteListSectionState extends State<_FavoriteListSection> {
                   InkWell(
                     onTap: _scrollLeft,
                     borderRadius: BorderRadius.circular(20),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
-                      child: Icon(Icons.chevron_left, color: isDarkMode ? Colors.white54 : Colors.black54),
-                    ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
+                        child: Icon(Icons.chevron_left, color: isDarkMode ? Colors.white54 : Colors.black54),
+                      ),
                   ),
                   Expanded(
                     child: SingleChildScrollView(
@@ -262,20 +262,34 @@ class _FavoriteListSectionState extends State<_FavoriteListSection> {
                       scrollDirection: Axis.horizontal,
                       child: Builder(
                         builder: (context) {
-                          if (widget.type == 'business') {
-                            // Calculate how many items fit in one row based on screen width
-                            int itemsPerRow = (MediaQuery.of(context).size.width - 64) ~/ 80;
-                            if (itemsPerRow < 1) itemsPerRow = 1;
+                          double availableWidth = MediaQuery.of(context).size.width - 96;
+                          double minPadding = 2.0; // 최소 간격 (양옆 2px씩, 즉 아이콘 사이 4px)
+                          
+                          int itemsPerRow = availableWidth ~/ (80 + minPadding * 2);
+                          if (itemsPerRow < 3) itemsPerRow = 3; // 아무리 좁아도 최소 3개
+                          if (itemsPerRow > 8) itemsPerRow = 8; // 너무 넓을 때 제한
 
+                          double hPad = (availableWidth - (80 * itemsPerRow)) / (itemsPerRow * 2);
+                          if (hPad < minPadding) hPad = minPadding;
+                          if (hPad > 20.0) hPad = 20.0; // 최대 간격 제한
+
+                          if (widget.type == 'business') {
                             List<Widget> row1 = [];
                             List<Widget> row2 = [];
                             
                             if (favorites.length <= itemsPerRow) {
-                              row1 = favorites.map((cat) => _buildFavoriteItem(cat, context)).toList();
+                              row1 = favorites.map((cat) => _buildFavoriteItem(cat, context, hPad)).toList();
                             } else {
+                              int half = (favorites.length / 2).ceil();
+                              if (half < itemsPerRow) {
+                                half = itemsPerRow;
+                              }
                               for (int i = 0; i < favorites.length; i++) {
-                                if (i % 2 == 0) row1.add(_buildFavoriteItem(favorites[i], context));
-                                else row2.add(_buildFavoriteItem(favorites[i], context));
+                                if (i < half) {
+                                  row1.add(_buildFavoriteItem(favorites[i], context, hPad));
+                                } else {
+                                  row2.add(_buildFavoriteItem(favorites[i], context, hPad));
+                                }
                               }
                             }
 
@@ -300,7 +314,7 @@ class _FavoriteListSectionState extends State<_FavoriteListSection> {
                             );
                           } else {
                             return Row(
-                              children: favorites.map((cat) => _buildFavoriteItem(cat, context)).toList(),
+                              children: favorites.map((cat) => _buildFavoriteItem(cat, context, hPad)).toList(),
                             );
                           }
                         }
@@ -323,9 +337,9 @@ class _FavoriteListSectionState extends State<_FavoriteListSection> {
       }
     );
   }
-  Widget _buildFavoriteItem(Map<String, dynamic> cat, BuildContext context) {
+  Widget _buildFavoriteItem(Map<String, dynamic> cat, BuildContext context, double horizontalPadding) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
@@ -353,10 +367,10 @@ class _FavoriteListSectionState extends State<_FavoriteListSection> {
             }
           }
         },
-        child: SizedBox(
-          width: widget.type == 'business' ? 76 : 80,
-          height: widget.type == 'business' ? 110 : 100,
-          child: Column(
+          child: SizedBox(
+            width: 80,
+            height: widget.type == 'business' ? 110 : 100,
+            child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               if (widget.type == 'business') ...[

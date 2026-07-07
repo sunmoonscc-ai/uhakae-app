@@ -870,7 +870,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 },
                 child: Image.asset(
                   isDarkMode ? 'assets/images/logo_dark.png' : 'assets/images/logo.png',
-                  height: 32,
+                  height: 50, fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) => Icon(Icons.admin_panel_settings, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
                 ),
               ),
