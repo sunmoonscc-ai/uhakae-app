@@ -2035,8 +2035,20 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  Widget _buildUserSortHeader(String title, String field, int flex, bool isDarkMode) {
+  Widget _buildUserSortHeader(String title, String field, int flex, bool isDarkMode, {Widget? customTitleIcon, AlignmentGeometry? alignment}) {
     bool isSelected = _userSortField == field;
+    Widget content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (customTitleIcon != null) customTitleIcon else Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87)),
+        Icon(
+          isSelected ? (_userSortDescending ? Icons.arrow_downward : Icons.arrow_upward) : Icons.arrow_upward,
+          size: 14,
+          color: isSelected ? (isDarkMode ? Colors.white70 : Colors.black87) : Colors.grey,
+        ),
+      ],
+    );
+
     return Expanded(
       flex: flex,
       child: InkWell(
@@ -2050,17 +2062,7 @@ class _AdminScreenState extends State<AdminScreen> {
             }
           });
         },
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87)),
-            Icon(
-              isSelected ? (_userSortDescending ? Icons.arrow_downward : Icons.arrow_upward) : Icons.arrow_upward,
-              size: 14,
-              color: isSelected ? (isDarkMode ? Colors.white70 : Colors.black87) : Colors.grey,
-            ),
-          ],
-        ),
+        child: alignment != null ? Align(alignment: alignment, child: content) : content,
       ),
     );
   }
@@ -2082,7 +2084,6 @@ class _AdminScreenState extends State<AdminScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
-                Text('${docs.length}명', style: TextStyle(color: isDarkMode ? Colors.blue[300] : Colors.blue[700], fontWeight: FontWeight.bold, fontSize: 12)),
               ],
             ),
           ),
@@ -2096,9 +2097,10 @@ class _AdminScreenState extends State<AdminScreen> {
               children: [
                 _buildUserSortHeader('이름', 'name', 4, isDarkMode),
                 _buildUserSortHeader('전화', 'phone_kr', 5, isDarkMode),
-                _buildUserSortHeader('어학원', 'school', 6, isDarkMode),
-                _buildUserSortHeader('연수시작일', 'start_date', 4, isDarkMode),
-                const SizedBox(width: 45), // 처리 버튼 공간
+                _buildUserSortHeader('어학원', 'school', 5, isDarkMode),
+                _buildUserSortHeader('연수시작일', 'start_date', 4, isDarkMode, alignment: Alignment.centerRight),
+                _buildUserSortHeader('', 'points', 3, isDarkMode, customTitleIcon: Icon(Icons.savings, color: isDarkMode ? Colors.white70 : Colors.black87, size: 14), alignment: Alignment.centerRight),
+                if (showApprove) const SizedBox(width: 45), // 처리 버튼 공간
               ],
             ),
           ),
@@ -2186,7 +2188,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                   ),
                                 ),
                                 Expanded(
-                                  flex: 6,
+                                  flex: 5,
                                   child: Text(
                                     displaySchool,
                                     style: TextStyle(color: isDarkMode ? Colors.blue[200] : Colors.blue[700], fontSize: 13),
@@ -2196,36 +2198,42 @@ class _AdminScreenState extends State<AdminScreen> {
                                 ),
                                 Expanded(
                                   flex: 4,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          startDate,
-                                          style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54, fontSize: 13),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (context) => AdminPointManagementDialog(userDoc: doc),
-                                          );
-                                        },
-                                        child: const Padding(
-                                          padding: EdgeInsets.only(left: 4.0),
-                                          child: Icon(Icons.savings, color: Colors.pinkAccent, size: 18),
-                                        ),
-                                      ),
-                                    ],
+                                  child: Text(
+                                    startDate,
+                                    style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54, fontSize: 13),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.right,
                                   ),
                                 ),
-                                SizedBox(
+                                Expanded(
+                                  flex: 3,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AdminPointManagementDialog(userDoc: doc),
+                                      );
+                                    },
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            '${data['points'] ?? 0} P',
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white : Colors.black),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (showApprove) SizedBox(
                                   width: 45,
-                                  child: showApprove
-                                      ? SizedBox(
+                                  child: SizedBox(
                                           height: 24,
                                           child: ElevatedButton(
                                             onPressed: () async {
@@ -2268,8 +2276,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                             ),
                                             child: const Text('처리', style: TextStyle(fontSize: 11, color: Colors.white)),
                                           ),
-                                        )
-                                      : const SizedBox(),
+                                        ),
                                 ),
                               ],
                             ),
