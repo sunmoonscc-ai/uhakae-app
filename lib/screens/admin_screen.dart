@@ -19,6 +19,8 @@ import '../widgets/admin_product_management_tab.dart';
 import '../utils/time_utils.dart';
 import '../services/preferences_service.dart';
 import '../widgets/admin_point_management_dialog.dart';
+import '../utils/admin_notification_manager.dart';
+import 'dart:async';
 
 class AdminScreen extends StatefulWidget {
   final String? initialTab;
@@ -66,6 +68,9 @@ class _AdminScreenState extends State<AdminScreen> {
   late Stream<QuerySnapshot> _adminCommunityStream;
 
   List<BusinessModel>? _cachedAdminBusinesses;
+  
+  int _lastPendingOrderCount = 0;
+  StreamSubscription<QuerySnapshot>? _orderSub;
 
   @override
   void initState() {
@@ -95,9 +100,33 @@ class _AdminScreenState extends State<AdminScreen> {
     _adminIndividualNoticeStream = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'individual_notice').snapshots();
     _adminCommunityStream = FirebaseFirestore.instance.collection('posts').where('category', isEqualTo: 'community').snapshots();
     
+    AdminNotificationManager.onNavigate = () {
+      if (mounted) {
+        setState(() {
+          _selectedTab = '컨시어지';
+          _conciergeSubTab = '주문관리';
+        });
+      }
+    };
+    
+    _orderSub = FirebaseFirestore.instance.collection('orders').where('status', isEqualTo: 'pending').snapshots().listen((snapshot) {
+      if (snapshot.docs.length > _lastPendingOrderCount && _lastPendingOrderCount > 0) {
+        int newOrders = snapshot.docs.length - _lastPendingOrderCount;
+        AdminNotificationManager.showNotification(newOrders);
+      }
+      _lastPendingOrderCount = snapshot.docs.length;
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPendingSuggestions();
     });
+  }
+
+  @override
+  void dispose() {
+    _orderSub?.cancel();
+    AdminNotificationManager.dismiss();
+    super.dispose();
   }
 
   Future<void> _checkPendingSuggestions() async {
@@ -663,11 +692,11 @@ class _AdminScreenState extends State<AdminScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.notifications_active, color: Colors.blueAccent),
+                      const Icon(Icons.notifications_active, color: Colors.pink),
                       const SizedBox(width: 4),
                       Text(
                         '+$pendingCount',
-                        style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 14),
+                        style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ],
                   ),
@@ -3110,7 +3139,19 @@ class _AdminScreenState extends State<AdminScreen> {
                                     }
                                     
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('모든 주문 기록이 초기화되었습니다.')));
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('알림'),
+                                          content: const Text('모든 주문 기록이 초기화되었습니다.'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: const Text('확인'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
                                     }
                                   }
                                 },

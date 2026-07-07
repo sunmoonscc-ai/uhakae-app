@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:study_abroad_app/widgets/admin_personal_notice_tab.dart';
+import 'package:study_abroad_app/widgets/admin_notification_badge.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
@@ -147,6 +148,9 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
             ),
           ],
         ),
+        actions: const [
+          AdminNotificationBadge(),
+        ],
         bottom: TabBar(
           controller: _tabController,
           onTap: _handleTabTap,

@@ -8,6 +8,7 @@ import 'contact_screen.dart';
 import '../services/preferences_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/business_model.dart';
+import '../widgets/admin_notification_badge.dart';
 import '../widgets/business_card.dart';
 import 'business_detail_screen.dart';
 import 'submit_info_screen.dart';
@@ -185,6 +186,7 @@ class _InfoScreenState extends State<InfoScreen> {
           ],
         ),
         actions: [
+          const AdminNotificationBadge(),
           ValueListenableBuilder<String>(
             valueListenable: infoMainCategoryNotifier,
             builder: (context, mainTab, _) {

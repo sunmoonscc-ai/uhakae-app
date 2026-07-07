@@ -9,6 +9,8 @@ import 'community_screen.dart';
 import 'post_detail_screen.dart';
 import 'info_screen.dart';
 import '../services/preferences_service.dart';
+import '../widgets/admin_notification_badge.dart';
+
 import '../models/business_model.dart';
 import 'business_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -91,35 +93,7 @@ class HomeScreen extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (name == '관리자')
-                            StreamBuilder<QuerySnapshot>(
-                              stream: FirebaseFirestore.instance.collection('orders').where('status', isEqualTo: 'pending').snapshots(),
-                              builder: (context, orderSnapshot) {
-                                int pendingCount = 0;
-                                if (orderSnapshot.hasData) {
-                                  pendingCount = orderSnapshot.data!.docs.length;
-                                }
-                                if (pendingCount == 0) return const SizedBox.shrink();
-
-                                return InkWell(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => const AdminScreen(initialTab: '대시보드')),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.notifications, color: Colors.blue),
-                                        Text('+$pendingCount', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                            const AdminNotificationBadge(),
                           Text(
                             '안녕하세요, $name님!',
                             style: TextStyle(

@@ -216,7 +216,19 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
         }
         if (context.mounted) {
           if (allSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('처리되었습니다.')));
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('알림'),
+                content: const Text('처리되었습니다.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('확인'),
+                  ),
+                ],
+              ),
+            );
           } else {
             showDialog(
               context: context,
@@ -941,7 +953,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
                   child: OutlinedButton(
-                    onPressed: () {
+                    onPressed: hasBankTransferOnly ? () {
                       _showAutoConfirmDialog(
                         title: '계좌이체 확인됨',
                         content: '결제를 확인하고 배송준비 상태로 변경하시겠습니까?\n(3초 후 자동으로 승인됩니다. 취소하려면 취소 버튼을 누르세요.)',
@@ -955,7 +967,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                           }
                         },
                       );
-                    },
+                    } : null,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: group.orders.any((o) => o.isTransferNotified) ? Colors.blue : Colors.black87,
                       side: BorderSide(color: group.orders.any((o) => o.isTransferNotified) ? Colors.blue : Colors.grey),
@@ -974,7 +986,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
                   child: ElevatedButton(
-                    onPressed: isPointPaymentAllowed ? () => _handleGroupApprove(group, userDocId) : null,
+                    onPressed: isPointPaymentAllowed ? () => _handleGroupApprove(group, userDocId!) : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,

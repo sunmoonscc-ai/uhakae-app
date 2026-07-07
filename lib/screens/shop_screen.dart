@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:study_abroad_app/models/product_model.dart';
+import '../widgets/admin_notification_badge.dart';
 import 'package:study_abroad_app/screens/cart_screen.dart';
 import 'package:study_abroad_app/services/cart_provider.dart';
 import 'package:study_abroad_app/services/shop_service.dart';
@@ -142,6 +143,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
           ],
         ),
         actions: [
+          const AdminNotificationBadge(),
           // 1. 장바구니 (Icon + Text + Badge)
           InkWell(
             onTap: () {
