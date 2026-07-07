@@ -73,7 +73,7 @@ class HomeScreen extends StatelessWidget {
                 stream: FirebaseAuth.instance.authStateChanges(),
                 builder: (context, snapshot) {
                   final user = snapshot.data;
-                  return FutureBuilder<DocumentSnapshot>(
+                  return FutureBuilder<DocumentSnapshot?>(
                     future: user != null ? FirebaseFirestore.instance.collection('users').doc(user.uid).get() : Future.value(null),
                     builder: (context, userSnapshot) {
                       String name = '게스트';
