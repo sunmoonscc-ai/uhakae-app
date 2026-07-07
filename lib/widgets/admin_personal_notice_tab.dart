@@ -39,6 +39,7 @@ class _AdminPersonalNoticeTabState extends State<AdminPersonalNoticeTab> {
           'slptas05@gmail.com',
           'sunmoon.scc@gmail.com',
           'hdcc6th@gmail.com',
+      'uhakae2026@gmail.com',
         ];
 
         docs = docs.where((doc) {

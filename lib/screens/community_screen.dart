@@ -124,6 +124,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
       'slptas05@gmail.com',
       'sunmoon.scc@gmail.com',
       'hdcc6th@gmail.com',
+      'uhakae2026@gmail.com',
     ].contains(user.email);
 
     return Scaffold(
@@ -508,6 +509,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
       'slptas05@gmail.com',
       'sunmoon.scc@gmail.com',
       'hdcc6th@gmail.com',
+      'uhakae2026@gmail.com',
     ].contains(user.email);
 
     var docs = List<QueryDocumentSnapshot>.from(originalDocs);

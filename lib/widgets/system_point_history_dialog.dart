@@ -35,6 +35,7 @@ class _SystemPointHistoryDialogState extends State<SystemPointHistoryDialog> {
             'slptas05@gmail.com',
             'sunmoon.scc@gmail.com',
             'hdcc6th@gmail.com',
+      'uhakae2026@gmail.com',
             'uhak2026@gmail.com',
           ];
           

@@ -259,7 +259,7 @@ class _AdminScreenState extends State<AdminScreen> {
       selectedLevel = '관리자';
     }
     
-    final List<String> levels = ['정회원', '예비', '연수종료', '관리자'];
+    final List<String> levels = ['정회원', '예비', '연수종료'];
     if (!levels.contains(selectedLevel)) {
       levels.add(selectedLevel);
     }
@@ -888,33 +888,44 @@ class _AdminScreenState extends State<AdminScreen> {
         actions: [
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('orders').where('status', isEqualTo: 'pending').snapshots(),
-            builder: (context, snapshot) {
-              int pendingCount = 0;
-              if (snapshot.hasData) {
-                pendingCount = snapshot.data!.docs.length;
-              }
-              if (pendingCount == 0) return const SizedBox.shrink();
+            builder: (context, orderSnapshot) {
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').where('level', isEqualTo: '예비').snapshots(),
+                builder: (context, userSnapshot) {
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('info_suggestions').where('status', isEqualTo: 'pending').snapshots(),
+                    builder: (context, infoSnapshot) {
+                      int pendingCount = 0;
+                      if (orderSnapshot.hasData) pendingCount += orderSnapshot.data!.docs.length;
+                      if (userSnapshot.hasData) pendingCount += userSnapshot.data!.docs.length;
+                      if (infoSnapshot.hasData) pendingCount += infoSnapshot.data!.docs.length;
 
-              return InkWell(
-                onTap: () {
-                  setState(() {
-                    _selectedTab = '대시보드';
-                  });
+                      if (pendingCount == 0) return const SizedBox.shrink();
+
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedTab = '대시보드';
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.notifications_active, color: Colors.pink),
+                              const SizedBox(width: 4),
+                              Text(
+                                '+$pendingCount',
+                                style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
                 },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.notifications_active, color: Colors.pink),
-                      const SizedBox(width: 4),
-                      Text(
-                        '+$pendingCount',
-                        style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
               );
             },
           ),

@@ -31,6 +31,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
     'slptas05@gmail.com',
     'sunmoon.scc@gmail.com',
     'hdcc6th@gmail.com',
+      'uhakae2026@gmail.com',
   ];
 
   @override

@@ -24,6 +24,7 @@ class _MoreMenuSheetState extends State<MoreMenuSheet> {
     'slptas05@gmail.com',
     'sunmoon.scc@gmail.com',
     'hdcc6th@gmail.com',
+      'uhakae2026@gmail.com',
   ];
 
   void _navigateToLogin() async {

@@ -22,6 +22,7 @@ class _MoreScreenState extends State<MoreScreen> {
     'slptas05@gmail.com',
     'sunmoon.scc@gmail.com',
     'hdcc6th@gmail.com',
+      'uhakae2026@gmail.com',
   ];
 
   void _loginMock() {

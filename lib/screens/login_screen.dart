@@ -20,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
     'slptas05@gmail.com',
     'sunmoon.scc@gmail.com',
     'hdcc6th@gmail.com',
+      'uhakae2026@gmail.com',
   ];
 
   Future<void> _signInWithGoogle() async {

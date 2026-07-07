@@ -62,6 +62,7 @@ class PostDetailScreen extends StatelessWidget {
                   'slptas05@gmail.com',
                   'sunmoon.scc@gmail.com',
                   'hdcc6th@gmail.com',
+      'uhakae2026@gmail.com',
                 ].contains(user.email);
                 
                 final bool isAuthor = user != null && currentData['author_id'] == user.uid;

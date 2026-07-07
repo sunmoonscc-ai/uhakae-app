@@ -135,10 +135,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         await PreferencesService.setUserRegion(userRegion);
 
         if (mounted) {
-          UiUtils.showPopup(context, '회원정보가 성공적으로 수정되었습니다.');
-          if (Navigator.canPop(context)) {
-            Navigator.pop(context);
-          }
+          UiUtils.showPopup(context, '회원정보가 저장되었습니다.');
+          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+            (route) => false,
+          );
         }
       }
     } catch (e) {
