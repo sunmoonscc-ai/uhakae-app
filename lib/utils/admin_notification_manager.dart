@@ -8,24 +8,9 @@ class AdminNotificationManager {
   static VoidCallback? onNavigate;
 
   static void showNotification(int additionalCount) {
-    if (additionalCount <= 0) return;
-    
-    _pendingCount += additionalCount;
-    
-    if (_overlayEntry == null) {
-      final overlay = rootNavigatorKey.currentState?.overlay;
-      if (overlay == null) {
-        debugPrint('AdminNotificationManager: overlay is null');
-        return;
-      }
-
-      _overlayEntry = OverlayEntry(
-        builder: (context) => _buildOverlay(context),
-      );
-      overlay.insert(_overlayEntry!);
-    } else {
-      _overlayEntry!.markNeedsBuild();
-    }
+    // The notification is now handled by the bell icon badge in the AppBar,
+    // so we no longer show the floating popup overlay.
+    return;
   }
 
   static void dismiss() {

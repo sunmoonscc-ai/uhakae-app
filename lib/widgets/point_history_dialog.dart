@@ -155,7 +155,7 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                           headingRowColor: MaterialStateProperty.all(isDarkMode ? Colors.grey[800] : Colors.grey[100]),
                           columns: [
                             DataColumn(
-                              label: Text('날짜', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+                              label: Expanded(child: Text('날짜', textAlign: TextAlign.center, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black))),
                               onSort: (columnIndex, ascending) {
                                 setState(() {
                                   _sortColumnIndex = columnIndex;
@@ -164,7 +164,7 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                               },
                             ),
                             DataColumn(
-                              label: Text('내용', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+                              label: Expanded(child: Text('내용', textAlign: TextAlign.center, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black))),
                               onSort: (columnIndex, ascending) {
                                 setState(() {
                                   _sortColumnIndex = columnIndex;
@@ -173,8 +173,7 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                               },
                             ),
                             DataColumn(
-                              label: Text('+', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-                              numeric: true,
+                              label: Expanded(child: Text('+', textAlign: TextAlign.center, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black))),
                               onSort: (columnIndex, ascending) {
                                 setState(() {
                                   _sortColumnIndex = columnIndex;
@@ -183,8 +182,7 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                               },
                             ),
                             DataColumn(
-                              label: Text('-', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-                              numeric: true,
+                              label: Expanded(child: Text('-', textAlign: TextAlign.center, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black))),
                               onSort: (columnIndex, ascending) {
                                 setState(() {
                                   _sortColumnIndex = columnIndex;
@@ -193,8 +191,7 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                               },
                             ),
                             DataColumn(
-                              label: Icon(Icons.savings, size: 20, color: isDarkMode ? Colors.white : Colors.black),
-                              numeric: true,
+                              label: Expanded(child: Align(alignment: Alignment.center, child: Icon(Icons.savings, size: 20, color: isDarkMode ? Colors.white : Colors.black))),
                               onSort: (columnIndex, ascending) {
                                 setState(() {
                                   _sortColumnIndex = columnIndex;
@@ -230,16 +227,21 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                                   : null,
                               cells: [
                                 DataCell(
-                                  Text(
-                                    dateStr, 
-                                    style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87, fontSize: 11),
+                                  Center(
+                                    child: Text(
+                                      dateStr, 
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87, fontSize: 11),
+                                    ),
                                   ),
                                 ),
                                 DataCell(
                                   Container(
                                     width: 80,
+                                    alignment: Alignment.center,
                                     child: Text(
                                       desc, 
+                                      textAlign: TextAlign.center,
                                       style: TextStyle(
                                         color: isDarkMode ? Colors.white70 : Colors.black87, 
                                         fontSize: 12,
@@ -251,29 +253,38 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                                   ),
                                 ),
                                 DataCell(
-                                  Text(
-                                    isIncome ? NumberFormat('#,###').format(amount) : '',
-                                    style: TextStyle(
-                                      color: isIncome ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
-                                      fontWeight: isIncome ? FontWeight.bold : FontWeight.normal,
+                                  Center(
+                                    child: Text(
+                                      isIncome ? NumberFormat('#,###').format(amount) : '',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: isIncome ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
+                                        fontWeight: isIncome ? FontWeight.bold : FontWeight.normal,
+                                      ),
                                     ),
                                   ),
                                 ),
                                 DataCell(
-                                  Text(
-                                    isExpense ? NumberFormat('#,###').format(amount.abs()) : '',
-                                    style: TextStyle(
-                                      color: isExpense ? Colors.red : (isDarkMode ? Colors.white70 : Colors.black87),
-                                      fontWeight: isExpense ? FontWeight.bold : FontWeight.normal,
+                                  Center(
+                                    child: Text(
+                                      isExpense ? NumberFormat('#,###').format(amount.abs()) : '',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: isExpense ? Colors.red : (isDarkMode ? Colors.white70 : Colors.black87),
+                                        fontWeight: isExpense ? FontWeight.bold : FontWeight.normal,
+                                      ),
                                     ),
                                   ),
                                 ),
                                 DataCell(
-                                  Text(
-                                    NumberFormat('#,###').format(balance),
-                                    style: TextStyle(
-                                      color: isDarkMode ? Colors.white : Colors.black,
-                                      fontWeight: FontWeight.bold,
+                                  Center(
+                                    child: Text(
+                                      NumberFormat('#,###').format(balance),
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white : Colors.black,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),

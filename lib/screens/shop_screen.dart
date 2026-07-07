@@ -169,7 +169,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                     children: [
                       const Padding(
                         padding: EdgeInsets.all(4.0),
-                        child: Icon(Icons.shopping_bag_outlined, color: Colors.black),
+                        child: Icon(Icons.shopping_cart_outlined, color: Colors.black),
                       ),
                       Positioned(
                         right: 0,
