@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import '../services/firebase_storage_service.dart';
 import 'school_admin_detail_screen.dart';
 import 'post_detail_screen.dart';
+import 'post_write_screen.dart';
 import '../widgets/business_map_view.dart';
 import '../models/business_model.dart';
 import '../widgets/business_card.dart';
@@ -852,6 +853,22 @@ class _AdminScreenState extends State<AdminScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
+      floatingActionButton: _selectedTab == '게시물' && (_postAdminSubTab == '공지사항' || _postAdminSubTab == '자유게시판')
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PostWriteScreen(
+                      initialCategory: _postAdminSubTab == '공지사항' ? 'notice' : 'community',
+                    ),
+                  ),
+                );
+              },
+              backgroundColor: isDarkMode ? Colors.blue[700] : Colors.blue,
+              child: const Icon(Icons.edit, color: Colors.white),
+            )
+          : null,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
@@ -2131,19 +2148,37 @@ class _AdminScreenState extends State<AdminScreen> {
                           'uhakae2026@gmail.com',
                         ];
                         final snapshot = await FirebaseFirestore.instance.collection('users').get();
-                        final batch = FirebaseFirestore.instance.batch();
                         int deleteCount = 0;
+                        
                         for (var doc in snapshot.docs) {
                           final data = doc.data();
                           if (!adminEmails.contains(data['email'])) {
-                            batch.delete(doc.reference);
+                            final uid = doc.id;
+                            
+                            // 연관 데이터 삭제 (포인트 내역)
+                            final pointDocs = await FirebaseFirestore.instance
+                                .collection('point_history')
+                                .where('userId', isEqualTo: uid)
+                                .get();
+                            for (var p in pointDocs.docs) {
+                              await p.reference.delete();
+                            }
+                            
+                            // 연관 데이터 삭제 (개인 알림/쪽지)
+                            final noticeDocs = await FirebaseFirestore.instance
+                                .collection('personal_notices')
+                                .where('userId', isEqualTo: uid)
+                                .get();
+                            for (var n in noticeDocs.docs) {
+                              await n.reference.delete();
+                            }
+                            
+                            // 사용자 삭제
+                            await doc.reference.delete();
                             deleteCount++;
                           }
                         }
-                        if (deleteCount > 0) {
-                          await batch.commit();
-                        }
-                        if (mounted) UiUtils.showPopup(context, '$deleteCount명의 일반 사용자가 삭제(초기화)되었습니다.');
+                        if (mounted) UiUtils.showPopup(context, '$deleteCount명의 일반 사용자와 관련 기록(포인트 등)이 삭제(초기화)되었습니다.');
                       }
                     },
                     style: ElevatedButton.styleFrom(

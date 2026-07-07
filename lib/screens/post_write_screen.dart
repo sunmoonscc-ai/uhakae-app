@@ -9,8 +9,14 @@ import '../services/firebase_storage_service.dart';
 class PostWriteScreen extends StatefulWidget {
   final String? editPostId;
   final Map<String, dynamic>? editPostData;
+  final String? initialCategory;
 
-  const PostWriteScreen({super.key, this.editPostId, this.editPostData});
+  const PostWriteScreen({
+    super.key, 
+    this.editPostId, 
+    this.editPostData, 
+    this.initialCategory,
+  });
 
   @override
   State<PostWriteScreen> createState() => _PostWriteScreenState();
@@ -45,7 +51,9 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
       _contentController.text = widget.editPostData!['content'] ?? '';
       _selectedCategory = widget.editPostData!['category'] ?? 'community';
     } else {
-      if (isAdmin) {
+      if (widget.initialCategory != null) {
+        _selectedCategory = widget.initialCategory!;
+      } else if (isAdmin) {
         _selectedCategory = 'notice';
       } else {
         _selectedCategory = 'community';

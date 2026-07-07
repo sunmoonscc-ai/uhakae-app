@@ -165,8 +165,7 @@ class _MainScreenState extends State<MainScreen> {
             
             bool isIncomplete = false;
             if (isAdminEmail) {
-              isIncomplete = name.trim().isEmpty || 
-                             phoneKr.trim().isEmpty;
+              isIncomplete = false; // 관리자는 추가 정보 입력 생략
             } else {
               isIncomplete = name.trim().isEmpty || 
                              phoneKr.trim().isEmpty || 
