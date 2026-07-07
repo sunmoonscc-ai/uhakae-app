@@ -166,12 +166,10 @@ class _MainScreenState extends State<MainScreen> {
             bool isIncomplete = false;
             if (isAdminEmail) {
               isIncomplete = name.trim().isEmpty || 
-                             phoneKr.trim().isEmpty || 
-                             phonePh.trim().isEmpty;
+                             phoneKr.trim().isEmpty;
             } else {
               isIncomplete = name.trim().isEmpty || 
                              phoneKr.trim().isEmpty || 
-                             phonePh.trim().isEmpty || 
                              school.trim().isEmpty || 
                              startDate.trim().isEmpty || 
                              endDate.trim().isEmpty;

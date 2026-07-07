@@ -119,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       content: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 16.0),
                         child: Text(
-                          level == '예비' ? '회원가입 검토중입니다.' : '승인된 사용자만 이용 가능합니다.',
+                          level == '예비' ? '회원 확인중입니다.' : '승인된 사용자만 이용 가능합니다.',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 16,

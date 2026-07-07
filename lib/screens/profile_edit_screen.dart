@@ -216,9 +216,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           style: TextStyle(
             color: enabled ? (isDarkMode ? Colors.white : Colors.black) : (isDarkMode ? Colors.white54 : Colors.black54),
           ),
-          validator: label == '이름' ? (value) {
+          validator: enabled ? (value) {
+            if (label == '휴대전화 (필리핀)') return null; // 필리핀 번호는 선택사항
             if (value == null || value.isEmpty) {
-              return '이름을 입력해주세요.';
+              return '$label을(를) 입력해주세요.';
             }
             return null;
           } : null,
@@ -282,6 +283,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               if (val != null) _schoolController.text = val;
             });
           },
+          validator: !isAdmin ? (value) {
+            if (value == null || value.isEmpty) {
+              return '어학원을 선택해주세요.';
+            }
+            return null;
+          } : null,
         ),
         const SizedBox(height: 24),
       ],

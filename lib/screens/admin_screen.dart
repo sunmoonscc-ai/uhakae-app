@@ -905,7 +905,19 @@ class _AdminScreenState extends State<AdminScreen> {
                       return InkWell(
                         onTap: () {
                           setState(() {
-                            _selectedTab = '대시보드';
+                            if (userSnapshot.hasData && userSnapshot.data!.docs.isNotEmpty) {
+                              _selectedTab = '사용자';
+                              _userAdminSubTab = '신청자';
+                            } else if (orderSnapshot.hasData && orderSnapshot.data!.docs.isNotEmpty) {
+                              _selectedTab = '컨시어지';
+                              _conciergeSubTab = '주문관리';
+                              _adminOrderFilter = 'pending';
+                            } else if (infoSnapshot.hasData && infoSnapshot.data!.docs.isNotEmpty) {
+                              _selectedTab = '정보';
+                              _infoSuggestionStatus = 'pending';
+                            } else {
+                              _selectedTab = '대시보드';
+                            }
                           });
                         },
                         child: Padding(
