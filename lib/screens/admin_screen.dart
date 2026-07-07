@@ -82,6 +82,19 @@ class _AdminScreenState extends State<AdminScreen> {
       _conciergeSubTab = widget.initialConciergeSubTab!;
     }
 
+    FirebaseFirestore.instance.collection('schools').get().then((snapshot) {
+      final existingIds = snapshot.docs.map((d) => d.id).toSet();
+      for (var school in _schoolList) {
+        if (!existingIds.contains(school)) {
+           FirebaseFirestore.instance.collection('schools').doc(school).set({
+             'location': '',
+             'rep_name': '',
+             'features': '',
+             'created_at': FieldValue.serverTimestamp(),
+           });
+        }
+      }
+    });
     
     final String defaultRegion = PreferencesService.defaultRegion;
     if (_regions.contains(defaultRegion)) {
@@ -427,6 +440,195 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
+  Future<void> _showAddSchoolDialog(BuildContext context, bool isDarkMode) async {
+    String selectedRegion = '바기오';
+    final nameCtrl = TextEditingController();
+    final locationCtrl = TextEditingController();
+    final repNameCtrl = TextEditingController();
+    final contactMainCtrl = TextEditingController();
+    final contactSubCtrl = TextEditingController();
+    final emailMainCtrl = TextEditingController();
+    final emailSubCtrl = TextEditingController();
+    
+    String? selectedBank;
+    final bankAccountNumCtrl = TextEditingController();
+    final bankAccountOwnerCtrl = TextEditingController();
+    final descriptionCtrl = TextEditingController();
+    final featuresCtrl = TextEditingController();
+    
+    List<String> bankList = [
+      '--- 한국 은행 ---',
+      '경남은행', '광주은행', '국민은행', '기업은행', '농협은행', '대구은행', 
+      '부산은행', '새마을금고', '수협은행', '신한은행', '신협', '우리은행', 
+      '우체국', '전북은행', '제주은행', '카카오뱅크', '케이뱅크', '토스뱅크', 
+      '하나은행', '한국투자증권', 'SC제일은행',
+      '--- 필리핀 은행 ---',
+      'BDO', 'BPI', 'Metrobank', 'PNB', 'RCBC', 'Security Bank', 'UnionBank'
+    ];
+
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+              title: const Text('어학원 새로 추가'),
+              content: SizedBox(
+                width: 500,
+                child: Form(
+                  key: formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          value: selectedRegion,
+                          decoration: const InputDecoration(labelText: '지역'),
+                          items: ['바기오', '클락', '세부', '보홀'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => selectedRegion = val);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: nameCtrl,
+                          decoration: const InputDecoration(labelText: '어학원 이름 (예: BECI)'),
+                          validator: (v) => v!.isEmpty ? '이름을 입력하세요' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: locationCtrl,
+                          decoration: const InputDecoration(labelText: '위치'),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: repNameCtrl,
+                          decoration: const InputDecoration(labelText: '대표자 이름'),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(child: TextFormField(controller: contactMainCtrl, decoration: const InputDecoration(labelText: '연락처 (대표)'))),
+                            const SizedBox(width: 8),
+                            Expanded(child: TextFormField(controller: contactSubCtrl, decoration: const InputDecoration(labelText: '연락처 (기타)'))),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(child: TextFormField(controller: emailMainCtrl, decoration: const InputDecoration(labelText: '이메일 (대표)'))),
+                            const SizedBox(width: 8),
+                            Expanded(child: TextFormField(controller: emailSubCtrl, decoration: const InputDecoration(labelText: '이메일 (기타)'))),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: selectedBank,
+                          decoration: const InputDecoration(labelText: '입금계좌 은행 (선택)'),
+                          dropdownColor: isDarkMode ? Colors.grey[800] : Colors.white,
+                          items: bankList.map((String value) {
+                            bool isSeparator = value.startsWith('---');
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              enabled: !isSeparator,
+                              child: Text(value, style: TextStyle(
+                                color: isSeparator ? Colors.grey : (isDarkMode ? Colors.white : Colors.black),
+                                fontWeight: isSeparator ? FontWeight.bold : FontWeight.normal,
+                              )),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null && !val.startsWith('---')) setState(() => selectedBank = val);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(flex: 3, child: TextFormField(controller: bankAccountNumCtrl, decoration: const InputDecoration(labelText: '계좌번호'))),
+                            const SizedBox(width: 8),
+                            Expanded(flex: 2, child: TextFormField(controller: bankAccountOwnerCtrl, decoration: const InputDecoration(labelText: '명의'))),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: descriptionCtrl,
+                          decoration: const InputDecoration(labelText: '어학원 소개'),
+                          maxLines: 4,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: featuresCtrl,
+                          decoration: const InputDecoration(labelText: '메모'),
+                          maxLines: 3,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('취소', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving ? null : () async {
+                    if (formKey.currentState!.validate()) {
+                      setState(() => isSaving = true);
+                      try {
+                        String schoolId = '${selectedRegion}_${nameCtrl.text.trim()}';
+                        final existing = await FirebaseFirestore.instance.collection('schools').doc(schoolId).get();
+                        if (existing.exists) {
+                          if (context.mounted) UiUtils.showPopup(context, '동일한 지역에 같은 이름의 어학원이 존재합니다.');
+                          setState(() => isSaving = false);
+                          return;
+                        }
+                        await FirebaseFirestore.instance.collection('schools').doc(schoolId).set({
+                          'location': locationCtrl.text,
+                          'rep_name': repNameCtrl.text,
+                          'contact_main': contactMainCtrl.text,
+                          'contact_sub': contactSubCtrl.text,
+                          'email_main': emailMainCtrl.text,
+                          'email_sub': emailSubCtrl.text,
+                          'bank_name': selectedBank ?? '',
+                          'bank_account_num': bankAccountNumCtrl.text,
+                          'bank_account_owner': bankAccountOwnerCtrl.text,
+                          'description': descriptionCtrl.text,
+                          'features': featuresCtrl.text,
+                          'created_at': FieldValue.serverTimestamp(),
+                          'updated_at': FieldValue.serverTimestamp(),
+                        });
+                        
+                        if (context.mounted) {
+                          Navigator.pop(dialogContext);
+                          UiUtils.showPopup(context, '어학원 정보가 추가되었습니다.');
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          UiUtils.showPopup(context, '추가 실패: $e');
+                          setState(() => isSaving = false);
+                        }
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                  child: isSaving 
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('추가', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          }
+        );
+      }
+    );
+  }
+
   Future<void> _showEditSchoolDialog(BuildContext context, String schoolName, bool isDarkMode) async {
     showDialog(
       context: context,
@@ -544,7 +746,7 @@ class _AdminScreenState extends State<AdminScreen> {
                               items: bankList.map((String bank) {
                                 bool isSeparator = bank.startsWith('---');
                                 return DropdownMenuItem<String>(
-                                  value: isSeparator ? null : bank,
+                                  value: bank,
                                   enabled: !isSeparator,
                                   child: Text(bank, style: TextStyle(
                                     color: isSeparator ? Colors.grey : (isDarkMode ? Colors.white : Colors.black),
@@ -553,7 +755,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                 );
                               }).toList(),
                               onChanged: (val) {
-                                if (val != null) setState(() => selectedBank = val);
+                                if (val != null && !val.startsWith('---')) setState(() => selectedBank = val);
                               },
                             ),
                             const SizedBox(height: 12),
@@ -953,15 +1155,16 @@ class _AdminScreenState extends State<AdminScreen> {
     if (_selectedTab == '어학원') {
       final List<String> regions = ['전체', '바기오', '클락', '세부', '보홀'];
       
-      final sortedSchools = _schoolList
-          .where((school) => _schoolAdminRegionTab == '전체' || school.startsWith('${_schoolAdminRegionTab}_'))
-          .toList();
-      
       return StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('schools').snapshots(),
         builder: (context, snapshot) {
           final docs = snapshot.data?.docs ?? [];
           final schoolDataMap = { for (var doc in docs) doc.id: doc.data() as Map<String, dynamic> };
+          
+          final sortedSchools = docs
+              .map((doc) => doc.id)
+              .where((school) => _schoolAdminRegionTab == '전체' || school.startsWith('${_schoolAdminRegionTab}_'))
+              .toList();
 
           return Column(
             children: [
@@ -970,37 +1173,51 @@ class _AdminScreenState extends State<AdminScreen> {
                   border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
                 ),
                 child: Row(
-                  children: regions.map((region) {
-                    final isSelected = _schoolAdminRegionTab == region;
-                    return Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          setState(() {
-                            _schoolAdminRegionTab = region;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(
-                                color: isSelected ? Colors.blue : Colors.transparent,
-                                width: 3,
+                  children: [
+                    ...regions.map((region) {
+                      final isSelected = _schoolAdminRegionTab == region;
+                      return Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _schoolAdminRegionTab = region;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: isSelected ? Colors.blue : Colors.transparent,
+                                  width: 3,
+                                ),
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              region,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
                               ),
                             ),
                           ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            region,
-                            style: TextStyle(
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black87),
-                            ),
-                          ),
                         ),
+                      );
+                    }),
+                    InkWell(
+                      onTap: () => _showAddSchoolDialog(context, isDarkMode),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        margin: const EdgeInsets.only(right: 8, left: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('새로 추가', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  ],
                 ),
               ),
               Container(
@@ -3071,7 +3288,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   else if (status == 'approved') approved++;
                   else if (status == 'preparing') preparing++;
                   else if (['shipping', 'delivered', 'not_received', 'receipt_confirmed'].contains(status)) shipping++;
-                  else if (['completed', 'rejected'].contains(status)) completed++;
+                  else if (['completed', 'rejected', 'canceled'].contains(status)) completed++;
 
                   if (['pending', 'approved', 'preparing', 'shipping', 'delivered', 'not_received', 'receipt_confirmed'].contains(status)) {
                     final items = data['items'] as List<dynamic>? ?? [];

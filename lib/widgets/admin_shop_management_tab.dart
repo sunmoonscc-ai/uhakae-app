@@ -426,7 +426,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
         int getStatusCount(String status) {
           var filtered = allOrders;
           if (status == 'completed') {
-            filtered = filtered.where((o) => ['completed', 'rejected'].contains(o.status)).toList();
+            filtered = filtered.where((o) => ['completed', 'rejected', 'canceled'].contains(o.status)).toList();
           } else if (status == 'shipping') {
             filtered = filtered.where((o) => ['shipping', 'delivered', 'not_received', 'receipt_confirmed'].contains(o.status)).toList();
           } else {
@@ -437,7 +437,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
 
         var displayOrders = allOrders;
         if (_selectedStatusFilter == 'completed') {
-          displayOrders = displayOrders.where((o) => ['completed', 'rejected'].contains(o.status)).toList();
+          displayOrders = displayOrders.where((o) => ['completed', 'rejected', 'canceled'].contains(o.status)).toList();
         } else if (_selectedStatusFilter == 'shipping') {
           displayOrders = displayOrders.where((o) => ['shipping', 'delivered', 'not_received', 'receipt_confirmed'].contains(o.status)).toList();
         } else {

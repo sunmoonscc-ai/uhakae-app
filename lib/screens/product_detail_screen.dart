@@ -353,13 +353,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       const SizedBox(height: 12),
                                       Text('필요 포인트: ${currencyFormatter.format(_totalPriceKrw)}', style: const TextStyle(fontSize: 14)),
                                       Text('보유 포인트: ${currencyFormatter.format(currentPoints)}', style: const TextStyle(fontSize: 14, color: Colors.redAccent)),
+                                      const SizedBox(height: 16),
+                                      const Text('포인트를 충전하시겠습니까?', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.blue)),
                                     ],
                                   ),
                                 ),
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.pop(ctx),
-                                    child: const Text('확인'),
+                                    child: const Text('아니요', style: TextStyle(color: Colors.grey)),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      final snapshot = await FirebaseFirestore.instance.collection('shop_items')
+                                        .where('name', isEqualTo: '컨시어지 포인트카드')
+                                        .limit(1)
+                                        .get();
+                                      
+                                      if (snapshot.docs.isNotEmpty) {
+                                        final doc = snapshot.docs.first;
+                                        final data = doc.data();
+                                        data['id'] = doc.id;
+                                        final product = Product.fromJson(data);
+                                        if (context.mounted) {
+                                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)));
+                                        }
+                                      } else {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('포인트 카드를 찾을 수 없습니다.')));
+                                        }
+                                      }
+                                    },
+                                    child: const Text('네', style: TextStyle(fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ),

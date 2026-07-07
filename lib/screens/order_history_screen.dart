@@ -24,6 +24,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       case 'receipt_confirmed': return '수령 완료';
       case 'completed': return '수령/대여 완료';
       case 'not_received': return '미수령 확인중';
+      case 'canceled': return '주문 취소';
       default: return '알 수 없음';
     }
   }
@@ -39,6 +40,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       case 'receipt_confirmed': return Colors.teal;
       case 'completed': return Colors.grey;
       case 'not_received': return Colors.redAccent;
+      case 'canceled': return Colors.red;
       default: return Colors.black;
     }
   }
@@ -83,8 +85,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               return const Center(child: Text('주문 내역이 없습니다.'));
             }
 
-            final inProgressOrders = orders.where((o) => !['completed', 'rejected'].contains(o.status)).toList();
-            final completedOrders = orders.where((o) => ['completed', 'rejected'].contains(o.status)).toList();
+            final inProgressOrders = orders.where((o) => !['completed', 'rejected', 'canceled'].contains(o.status)).toList();
+            final completedOrders = orders.where((o) => ['completed', 'rejected', 'canceled'].contains(o.status)).toList();
 
             return TabBarView(
               children: [
