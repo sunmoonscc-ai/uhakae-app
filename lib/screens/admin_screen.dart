@@ -2095,6 +2095,52 @@ class _AdminScreenState extends State<AdminScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+                if (title.contains('회원'))
+                  ElevatedButton(
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('전체 사용자 초기화'),
+                          content: const Text('테스트 목적의 기능입니다.\n하드코딩된 관리자를 제외한 모든 사용자를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소', style: TextStyle(color: Colors.grey))),
+                            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('삭제', style: TextStyle(color: Colors.red))),
+                          ],
+                        ),
+                      );
+                      
+                      if (confirm == true) {
+                        final adminEmails = [
+                          'cebufriends79@gmail.com',
+                          'slptas05@gmail.com',
+                          'sunmoon.scc@gmail.com',
+                          'hdcc6th@gmail.com',
+                          'uhakae2026@gmail.com',
+                        ];
+                        final snapshot = await FirebaseFirestore.instance.collection('users').get();
+                        final batch = FirebaseFirestore.instance.batch();
+                        int deleteCount = 0;
+                        for (var doc in snapshot.docs) {
+                          final data = doc.data();
+                          if (!adminEmails.contains(data['email'])) {
+                            batch.delete(doc.reference);
+                            deleteCount++;
+                          }
+                        }
+                        if (deleteCount > 0) {
+                          await batch.commit();
+                        }
+                        if (mounted) UiUtils.showPopup(context, '$deleteCount명의 일반 사용자가 삭제(초기화)되었습니다.');
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      minimumSize: Size.zero,
+                    ),
+                    child: const Text('초기화 (테스트용)', style: TextStyle(color: Colors.white, fontSize: 11)),
+                  ),
               ],
             ),
           ),

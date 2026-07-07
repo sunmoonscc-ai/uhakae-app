@@ -58,7 +58,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (_adminEmails.contains(user.email)) {
           isAuthorized = true;
-          // 관리자는 로그인 시 last_login만 갱신하거나 무시해도 됨
+          // 관리자가 Firestore에 없으면 추가, 있으면 last_login 업데이트
+          final QuerySnapshot adminCheck = await FirebaseFirestore.instance
+              .collection('users')
+              .where('email', isEqualTo: user.email)
+              .limit(1)
+              .get();
+          if (adminCheck.docs.isEmpty) {
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+              'email': user.email,
+              'name': user.displayName ?? '관리자',
+              'phone_kr': '',
+              'school': '관리자',
+              'start_date': '',
+              'level': '관리자',
+              'created_at': FieldValue.serverTimestamp(),
+              'last_login': FieldValue.serverTimestamp(),
+              'points': 0,
+            });
+          } else {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(adminCheck.docs.first.id)
+                .update({'last_login': FieldValue.serverTimestamp()});
+          }
         } else {
           // 2. Firestore의 'users' 컬렉션에 등록된 이메일인지 확인
           final QuerySnapshot result = await FirebaseFirestore.instance

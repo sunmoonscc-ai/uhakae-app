@@ -144,69 +144,6 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
         ),
         actions: [
           const AdminNotificationBadge(),
-          // 1. 장바구니 (Icon + Text + Badge)
-          InkWell(
-            onTap: () {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                useSafeArea: true,
-                builder: (context) => ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                  child: SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.9,
-                    child: const CartScreen(),
-                  ),
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2.0),
-              child: Row(
-                children: [
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.all(4.0),
-                        child: Icon(Icons.shopping_cart_outlined, color: Colors.black),
-                      ),
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Consumer<CartProvider>(
-                          builder: (context, cart, child) {
-                            if (cart.itemCount == 0) return const SizedBox.shrink();
-                            return Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 16,
-                                minHeight: 16,
-                              ),
-                              child: Text(
-                                '${cart.itemCount}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    ],
-                  ),
-                  const SizedBox(width: 2),
-                  const Text('장바구니', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
-                ],
-              ),
-            ),
-          ),
           InkWell(
             onTap: () {
               showModalBottomSheet(
@@ -232,6 +169,63 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                   ),
                   const SizedBox(width: 2),
                   const Text('주문내역', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+            ),
+          ),
+          // 1. 장바구니 (Icon + Badge)
+          InkWell(
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (context) => ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  child: SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.9,
+                    child: const CartScreen(),
+                  ),
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(4.0),
+                    child: Icon(Icons.shopping_cart_outlined, color: Colors.black),
+                  ),
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Consumer<CartProvider>(
+                      builder: (context, cart, child) {
+                        if (cart.itemCount == 0) return const SizedBox.shrink();
+                        return Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            '${cart.itemCount}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        );
+                      },
+                    ),
+                  )
                 ],
               ),
             ),
