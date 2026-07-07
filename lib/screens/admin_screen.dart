@@ -1917,7 +1917,13 @@ class _AdminScreenState extends State<AdminScreen> {
         docs = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final email = data['email'] as String? ?? '';
-          if (adminEmails.contains(email)) return false;
+          final name = data['name'] as String? ?? '';
+          
+          if (email.isEmpty || name.isEmpty) return false;
+
+          if (adminEmails.contains(email)) {
+            return _userAdminRegion == '전체';
+          }
           
           final school = data['school'] as String? ?? '';
           
@@ -1930,15 +1936,7 @@ class _AdminScreenState extends State<AdminScreen> {
           return true;
         }).toList();
 
-        var rawDocs = snapshot.data!.docs;
-        var filteredDocs = rawDocs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final email = data['email'];
-          final name = data['name'];
-          return email != null && email.toString().isNotEmpty && name != null && name.toString().isNotEmpty;
-        }).toList();
-        
-        var modifiableDocs = List<QueryDocumentSnapshot>.from(filteredDocs);
+        var modifiableDocs = List<QueryDocumentSnapshot>.from(docs);
         modifiableDocs.sort((a, b) {
           final aMap = a.data() as Map<String, dynamic>;
           final bMap = b.data() as Map<String, dynamic>;
@@ -2056,8 +2054,11 @@ class _AdminScreenState extends State<AdminScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87)),
-            if (isSelected)
-              Icon(_userSortDescending ? Icons.arrow_downward : Icons.arrow_upward, size: 14, color: isDarkMode ? Colors.white70 : Colors.black87),
+            Icon(
+              isSelected ? (_userSortDescending ? Icons.arrow_downward : Icons.arrow_upward) : Icons.arrow_upward,
+              size: 14,
+              color: isSelected ? (isDarkMode ? Colors.white70 : Colors.black87) : Colors.grey,
+            ),
           ],
         ),
       ),
