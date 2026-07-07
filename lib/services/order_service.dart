@@ -12,7 +12,7 @@ class OrderService {
       final user = _auth.currentUser;
       if (user == null) return false;
 
-      orderData['userId'] = user.uid; // Or user.email if preferred
+      orderData['userId'] = user.uid;
       
       String? userDocId;
       if (user.email != null) {
@@ -26,12 +26,47 @@ class OrderService {
         }
       }
 
-      orderData['status'] = 'pending'; // Initial status
+      orderData['status'] = 'pending';
       orderData['createdAt'] = FieldValue.serverTimestamp();
 
-      final newOrderRef = await _firestore.collection('orders').add(orderData);
+      return await _firestore.runTransaction((transaction) async {
+        double pointsToDeduct = 0;
+        final items = List<dynamic>.from(orderData['items'] ?? []);
+        for (var item in items) {
+          if (item['isBankTransferOnly'] != true) {
+            pointsToDeduct += (item['totalPriceKrw'] ?? 0).toDouble();
+          }
+        }
 
-      return true;
+        if (pointsToDeduct > 0 && userDocId != null) {
+          final userRef = _firestore.collection('users').doc(userDocId);
+          final userDoc = await transaction.get(userRef);
+          if (userDoc.exists) {
+            final currentPoints = (userDoc.data()?['points'] as num?)?.toDouble() ?? 0.0;
+            if (currentPoints < pointsToDeduct) {
+              throw Exception('Not enough points');
+            }
+            transaction.update(userRef, {
+              'points': FieldValue.increment(-pointsToDeduct),
+            });
+            
+            final historyRef = _firestore.collection('point_history').doc();
+            transaction.set(historyRef, {
+              'userId': userDocId,
+              'amount': -pointsToDeduct,
+              'type': 'order_payment',
+              'description': '물품 구매',
+              'orderId': 'pending_order', // Will be updated later if needed, or we just don't have orderId yet
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+
+        final newOrderRef = _firestore.collection('orders').doc();
+        transaction.set(newOrderRef, orderData);
+        
+        return true;
+      });
     } catch (e) {
       print('Error submitting order: $e');
       return false;
@@ -54,11 +89,58 @@ class OrderService {
         });
   }
 
-  // 3. User updates order status (e.g. completed, not_received)
+  // 3. User updates order status (e.g. completed, not_received, canceled)
   Future<bool> updateOrderStatusByUser(String orderId, String newStatus) async {
     try {
-      await _firestore.collection('orders').doc(orderId).update({'status': newStatus});
-      return true;
+      if (newStatus == 'canceled') {
+        return await _firestore.runTransaction((transaction) async {
+          final orderRef = _firestore.collection('orders').doc(orderId);
+          final freshSnap = await transaction.get(orderRef);
+          if (!freshSnap.exists) return false;
+          
+          final orderData = freshSnap.data() as Map<String, dynamic>;
+          final currentStatus = orderData['status'];
+          
+          if (currentStatus != 'pending' && currentStatus != 'approved') return false;
+
+          transaction.update(orderRef, {'status': newStatus});
+
+          double refundKrw = 0;
+          final items = List<dynamic>.from(orderData['items'] ?? []);
+          for (var item in items) {
+            if (item['isBankTransferOnly'] != true) {
+              refundKrw += (item['totalPriceKrw'] ?? 0).toDouble();
+            }
+          }
+          
+          final userEmail = orderData['userEmail'];
+          if (refundKrw > 0 && userEmail != null) {
+            final userSnap = await _firestore.collection('users').where('email', isEqualTo: userEmail).limit(1).get();
+            if (userSnap.docs.isNotEmpty) {
+              final userDocId = userSnap.docs.first.id;
+              final userRef = _firestore.collection('users').doc(userDocId);
+              
+              transaction.update(userRef, {
+                'points': FieldValue.increment(refundKrw),
+              });
+              
+              final historyRef = _firestore.collection('point_history').doc();
+              transaction.set(historyRef, {
+                'userId': userDocId,
+                'amount': refundKrw,
+                'type': 'order_cancel_refund',
+                'description': '주문 취소 포인트 환불',
+                'orderId': orderId,
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+            }
+          }
+          return true;
+        });
+      } else {
+        await _firestore.collection('orders').doc(orderId).update({'status': newStatus});
+        return true;
+      }
     } catch (e) {
       print('Error updating order status: $e');
       return false;
@@ -169,6 +251,20 @@ class OrderService {
     }
   }
 
+  // 5.0.1 Admin requests bank transfer again (no record found)
+  Future<bool> requestTransferAgain(String orderId) async {
+    try {
+      await _firestore.collection('orders').doc(orderId).update({
+        'isTransferNotified': false,
+        'transferRejectReason': '이체 내역을 찾을 수 없습니다. 다시 확인 후 송금 완료를 눌러주세요.', // Optional field to show to user
+      });
+      return true;
+    } catch (e) {
+      print('Error requesting bank transfer again: $e');
+      return false;
+    }
+  }
+
   // 5.1 Admin updates individual item status
   Future<bool> updateOrderItemStatusByAdmin(String orderId, int itemIndex, String newStatus, {String? rejectReason}) async {
     try {
@@ -238,48 +334,7 @@ class OrderService {
     }
   }
 
-  // 6. Admin deducts points and sets status to preparing
-  Future<bool> deductPointsAndPrepare(String orderId, String userDocId, double amount) async {
-    try {
-      return await _firestore.runTransaction((transaction) async {
-        final userDocRef = _firestore.collection('users').doc(userDocId);
-        
-        final userSnapshot = await transaction.get(userDocRef);
-        if (!userSnapshot.exists) {
-          throw Exception("User not found");
-        }
 
-        final userData = userSnapshot.data() as Map<String, dynamic>;
-        final currentPoints = (userData['points'] ?? 0).toDouble();
-
-        if (currentPoints < amount) {
-          throw Exception("Insufficient points");
-        }
-
-        transaction.update(userDocRef, {
-          'points': currentPoints - amount
-        });
-
-        final historyRef = _firestore.collection('point_history').doc();
-        transaction.set(historyRef, {
-          'userId': userDocId,
-          'amount': -amount,
-          'type': 'order_payment_by_admin',
-          'description': '관리자 승인에 의한 결제 (주문 물품)',
-          'orderId': orderId,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-
-        transaction.update(_firestore.collection('orders').doc(orderId), {
-          'status': 'preparing'
-        });
-        return true;
-      });
-    } catch (e) {
-      print('Error in deductPointsAndPrepare: $e');
-      return false;
-    }
-  }
 
   // 7. Admin confirms bank transfer and adds points for recharge items
   Future<bool> confirmBankTransfer(String orderId, String userDocId) async {
@@ -335,6 +390,69 @@ class OrderService {
       });
     } catch (e) {
       print('Error confirming bank transfer: $e');
+      return false;
+    }
+  }
+  // 10. Process Return (Admin)
+  Future<bool> processReturn(String orderId, bool isDamaged) async {
+    try {
+      final orderSnap = await _firestore.collection('orders').doc(orderId).get();
+      if (!orderSnap.exists) return false;
+      
+      final orderData = orderSnap.data() as Map<String, dynamic>;
+      final userEmail = orderData['userEmail'];
+      String? userDocId;
+
+      if (userEmail != null) {
+        final userQuery = await _firestore.collection('users').where('email', isEqualTo: userEmail).limit(1).get();
+        if (userQuery.docs.isNotEmpty) {
+          userDocId = userQuery.docs.first.id;
+        }
+      }
+
+      return await _firestore.runTransaction((transaction) async {
+        final orderRef = _firestore.collection('orders').doc(orderId);
+        final freshSnap = await transaction.get(orderRef);
+        if (!freshSnap.exists) return false;
+
+        final freshData = freshSnap.data() as Map<String, dynamic>;
+        
+        final newStatus = isDamaged ? 'returned_damaged' : 'returned';
+        transaction.update(orderRef, {'status': newStatus});
+
+        if (!isDamaged && userDocId != null) {
+          // Calculate refund (sum of depositKrw * quantity)
+          double depositRefund = 0;
+          final items = freshData['items'] as List<dynamic>? ?? [];
+          for (var item in items) {
+            if (item['type'] == 'rent') {
+              final deposit = (item['depositKrw'] ?? 0).toDouble();
+              final quantity = (item['quantity'] ?? 1) as int;
+              depositRefund += deposit * quantity;
+            }
+          }
+
+          if (depositRefund > 0) {
+            final userRef = _firestore.collection('users').doc(userDocId);
+            transaction.update(userRef, {
+              'points': FieldValue.increment(depositRefund),
+            });
+
+            final historyRef = _firestore.collection('point_history').doc();
+            transaction.set(historyRef, {
+              'userId': userDocId,
+              'amount': depositRefund,
+              'type': 'deposit_refund',
+              'description': '물품 정상 반납에 따른 보증금 환불',
+              'orderId': orderId,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+        return true;
+      });
+    } catch (e) {
+      print('Error processing return: $e');
       return false;
     }
   }

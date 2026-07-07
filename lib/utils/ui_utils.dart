@@ -51,4 +51,72 @@ class UiUtils {
       overlayEntry.remove();
     });
   }
+
+  static void showTopPopup(BuildContext context, String message) {
+    final overlay = Navigator.of(context).overlay;
+    if (overlay == null) return;
+
+    late OverlayEntry overlayEntry;
+    bool isRemoved = false;
+    
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 20,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade600,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                )
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    if (!isRemoved) {
+                      isRemoved = true;
+                      overlayEntry.remove();
+                    }
+                  },
+                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+
+    // 4초 후 자동 닫기
+    Future.delayed(const Duration(seconds: 4), () {
+      if (!isRemoved) {
+        isRemoved = true;
+        overlayEntry.remove();
+      }
+    });
+  }
 }

@@ -8,8 +8,9 @@ import 'package:intl/intl.dart';
 
 class AdminProductManagementTab extends StatefulWidget {
   final String productType; // 'buy' or 'rent'
+  final String? initialProductId;
 
-  const AdminProductManagementTab({super.key, required this.productType});
+  const AdminProductManagementTab({super.key, required this.productType, this.initialProductId});
 
   @override
   State<AdminProductManagementTab> createState() => _AdminProductManagementTabState();
@@ -346,6 +347,10 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
 
               var docs = (snapshot.data?.docs ?? []).toList();
               
+              if (widget.initialProductId != null) {
+                docs = docs.where((doc) => doc.id == widget.initialProductId).toList();
+              }
+
               docs.sort((a, b) {
                 final aData = a.data() as Map<String, dynamic>;
                 final bData = b.data() as Map<String, dynamic>;
@@ -384,10 +389,20 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
                             ),
                         ],
                       ),
-                      subtitle: Text(
-                        widget.productType == 'buy'
-                            ? '₩${NumberFormat('#,##0').format(data['priceKrw'] ?? data['pricePhp'] ?? 0)}\n${data['description'] ?? ''}'
-                            : '₩${NumberFormat('#,##0').format(data['priceKrw'] ?? data['pricePhp'] ?? 0)} (보증금: ₩${NumberFormat('#,##0').format(data['depositKrw'] ?? 0)})\n${data['description'] ?? ''}',
+                      subtitle: Text.rich(
+                        TextSpan(
+                          children: widget.productType == 'buy'
+                            ? [
+                                const WidgetSpan(child: Padding(padding: EdgeInsets.only(right: 2), child: Icon(Icons.savings, size: 14, color: Colors.grey))),
+                                TextSpan(text: '${NumberFormat('#,##0').format(data['priceKrw'] ?? data['pricePhp'] ?? 0)}\n${data['description'] ?? ''}'),
+                              ]
+                            : [
+                                const WidgetSpan(child: Padding(padding: EdgeInsets.only(right: 2), child: Icon(Icons.savings, size: 14, color: Colors.grey))),
+                                TextSpan(text: '${NumberFormat('#,##0').format(data['priceKrw'] ?? data['pricePhp'] ?? 0)} (보증금: '),
+                                const WidgetSpan(child: Padding(padding: EdgeInsets.only(right: 2), child: Icon(Icons.savings, size: 14, color: Colors.grey))),
+                                TextSpan(text: '${NumberFormat('#,##0').format(data['depositKrw'] ?? 0)})\n${data['description'] ?? ''}'),
+                              ],
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),

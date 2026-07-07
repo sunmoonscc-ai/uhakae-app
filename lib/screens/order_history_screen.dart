@@ -186,38 +186,74 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                               style: TextStyle(color: _getStatusColor(order.status), fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 4),
-                            Text(
-                              '₩${currencyFormatter.format(order.totalKrw)}',
-                              style: TextStyle(
-                                color: orderHasBankTransferOnly ? Colors.blue : Colors.redAccent, 
-                                fontWeight: FontWeight.bold, 
-                                fontSize: 13
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.savings, color: orderHasBankTransferOnly ? Colors.blue : Colors.redAccent, size: 16),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${currencyFormatter.format(order.totalKrw)}',
+                                  style: TextStyle(
+                                    color: orderHasBankTransferOnly ? Colors.blue : Colors.redAccent, 
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
-                      if (order.status == 'approved' && orderHasBankTransferOnly)
+                      if (order.status == 'pending' || order.status == 'approved')
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              if (order.isTransferNotified)
-                                const Text('송금 확인 대기중', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13))
-                              else
-                                ElevatedButton(
-                                  onPressed: () {
-                                    _orderService.notifyBankTransfer(order.id);
-                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('관리자에게 송금 완료 알림이 전송되었습니다.')));
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    minimumSize: Size.zero,
-                                  ),
-                                  child: const Text('계좌이체 완료 알림', style: TextStyle(color: Colors.white, fontSize: 12)),
+                              OutlinedButton(
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('주문 취소'),
+                                      content: const Text('주문을 취소하시겠습니까?'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('아니오')),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                            _orderService.updateOrderStatusByUser(order.id, 'canceled');
+                                          },
+                                          child: const Text('예', style: TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  minimumSize: Size.zero,
                                 ),
+                                child: const Text('주문 취소', style: TextStyle(fontSize: 12)),
+                              ),
+                              if (order.status == 'approved' && orderHasBankTransferOnly) ...[
+                                const SizedBox(width: 8),
+                                if (order.isTransferNotified)
+                                  const Text('송금 확인 대기중', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13))
+                                else
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      _orderService.notifyBankTransfer(order.id);
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('관리자에게 송금 완료 알림이 전송되었습니다.')));
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blue,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      minimumSize: Size.zero,
+                                    ),
+                                    child: const Text('계좌이체 완료 알림', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                  ),
+                              ],
                             ],
                           ),
                         ),
@@ -318,7 +354,14 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
-                          Text('₩${currencyFormatter.format(item['totalPriceKrw'] ?? item['totalPricePhp'] ?? 0)}'),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.savings, size: 14),
+                              const SizedBox(width: 2),
+                              Text('${currencyFormatter.format(item['totalPriceKrw'] ?? item['totalPricePhp'] ?? 0)}'),
+                            ],
+                          ),
                         ],
                       ),
                     );
@@ -328,13 +371,20 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('총 결제 금액', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Text(
-                        '₩${currencyFormatter.format(order.totalKrw)}',
-                        style: const TextStyle(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.savings, color: Colors.redAccent, size: 20),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${currencyFormatter.format(order.totalKrw)}',
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

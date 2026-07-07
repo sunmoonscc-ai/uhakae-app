@@ -5,6 +5,8 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:study_abroad_app/models/product_model.dart';
 import 'package:study_abroad_app/services/cart_provider.dart';
 import 'package:study_abroad_app/screens/cart_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -28,7 +30,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   double get _totalPriceKrw {
     if (widget.product.type == 'rent') {
-      return (widget.product.priceKrw * _rentalDays + widget.product.depositKrw) * _quantity;
+      return (widget.product.priceKrw + widget.product.depositKrw) * _quantity;
     }
     return widget.product.priceKrw * _quantity;
   }
@@ -80,9 +82,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        '₩${currencyFormatter.format(widget.product.priceKrw)}',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.savings, color: Colors.blueAccent, size: 22),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${currencyFormatter.format(widget.product.priceKrw)}',
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                          ),
+                        ],
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -94,9 +103,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   if (widget.product.type == 'rent' && widget.product.depositKrw > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0),
-                      child: Text(
-                        '보증금: ₩${currencyFormatter.format(widget.product.depositKrw)}',
-                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('보증금: ', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                          const Icon(Icons.savings, color: Colors.grey, size: 14),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${currencyFormatter.format(widget.product.depositKrw)}',
+                            style: const TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                        ],
                       ),
                     ),
                   const SizedBox(height: 24),
@@ -112,10 +129,55 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ? () => setState(() => _quantity--)
                             : null,
                       ),
-                      Text('$_quantity', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      InkWell(
+                        onTap: () {
+                          final ctrl = TextEditingController(text: '$_quantity');
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('수량 입력', style: TextStyle(fontSize: 16)),
+                              content: TextField(
+                                controller: ctrl,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(hintText: '수량을 입력하세요'),
+                                autofocus: true,
+                              ),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+                                TextButton(
+                                  onPressed: () {
+                                    final val = int.tryParse(ctrl.text.trim());
+                                    if (val != null && val > 0) {
+                                      setState(() {
+                                        if (widget.product.totalQuantity > 0 && val > widget.product.totalQuantity) {
+                                          _quantity = widget.product.totalQuantity;
+                                        } else {
+                                          _quantity = val;
+                                        }
+                                      });
+                                    }
+                                    Navigator.pop(ctx);
+                                  },
+                                  child: const Text('확인'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('$_quantity', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
                       IconButton(
                         icon: const Icon(Icons.add_circle_outline),
-                        onPressed: () => setState(() => _quantity++),
+                        onPressed: (widget.product.totalQuantity == 0 || _quantity < widget.product.totalQuantity)
+                            ? () => setState(() => _quantity++)
+                            : null,
                       ),
                     ],
                   ),
@@ -164,9 +226,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(
-                            '₩${currencyFormatter.format(_totalPriceKrw)}',
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                          Row(
+                            children: [
+                              const Icon(Icons.savings, color: Colors.redAccent, size: 22),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${currencyFormatter.format(_totalPriceKrw)}',
+                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -184,7 +252,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           child: ElevatedButton(
             onPressed: widget.product.stockStatus == 'out_of_stock'
                 ? null
-                : () {
+                : () async {
                     if (widget.product.type == 'rent' && (_startDate == null || _endDate == null)) {
                       showDialog(
                         context: context,
@@ -204,14 +272,113 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       );
                       return;
                     }
+
+                    if (!widget.product.isBankTransferOnly) {
+                      final user = FirebaseAuth.instance.currentUser;
+                      if (user != null) {
+                        final cartProvider = Provider.of<CartProvider>(context, listen: false);
+                        int currentCartQty = 0;
+                        for (var item in cartProvider.items) {
+                          if (item.product.id == widget.product.id) {
+                            currentCartQty += item.quantity;
+                          }
+                        }
+                        
+                        int actualTotalQuantity = widget.product.totalQuantity;
+                        if (widget.product.totalQuantity > 0) {
+                          int inProgress = 0;
+                          final activeOrders = await FirebaseFirestore.instance
+                              .collection('orders')
+                              .where('status', whereIn: ['pending', 'processing', 'shipping'])
+                              .get();
+                          for (var doc in activeOrders.docs) {
+                            final items = doc.data()['items'] as List<dynamic>? ?? [];
+                            for (var item in items) {
+                              if (item['productId'] == widget.product.id) {
+                                inProgress += (item['quantity'] as num?)?.toInt() ?? 0;
+                              }
+                            }
+                          }
+                          actualTotalQuantity = widget.product.totalQuantity - inProgress;
+                          if (actualTotalQuantity < 0) actualTotalQuantity = 0;
+                        }
+
+                        if (widget.product.totalQuantity > 0 && (_quantity + currentCartQty) > actualTotalQuantity) {
+                          if (context.mounted) {
+                            final maxAllowed = actualTotalQuantity - currentCartQty;
+                            
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                content: Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(
+                                    maxAllowed > 0 
+                                      ? '재고수량($actualTotalQuantity개)보다 많은 수량을 요청하셨습니다.\n(현재 장바구니: $currentCartQty개)\n\n지금 추가할 수 있는 최대 수량인 $maxAllowed개로 조정됩니다.'
+                                      : '더 이상 장바구니에 담을 수 없습니다.\n현재 신청 가능한 재고수량($actualTotalQuantity개)을 모두 장바구니에 담으셨습니다.', 
+                                    textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('확인')),
+                                ],
+                              ),
+                            );
+                            
+                            if (maxAllowed > 0) {
+                              setState(() {
+                                _quantity = maxAllowed;
+                              });
+                            }
+                          }
+                          return;
+                        }
+
+                        final userQuery = await FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).get();
+                        final currentPoints = userQuery.docs.isNotEmpty ? ((userQuery.docs.first.data()['points'] as num?)?.toDouble() ?? 0.0) : 0.0;
+                        if (currentPoints < _totalPriceKrw) {
+                          if (context.mounted) {
+                            final currencyFormatter = NumberFormat('#,##0', 'en_US');
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                content: Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('보유 포인트가 부족합니다.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 12),
+                                      Text('필요 포인트: ${currencyFormatter.format(_totalPriceKrw)}', style: const TextStyle(fontSize: 14)),
+                                      Text('보유 포인트: ${currencyFormatter.format(currentPoints)}', style: const TextStyle(fontSize: 14, color: Colors.redAccent)),
+                                    ],
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('확인'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                      }
+                    }
                     
-                    Provider.of<CartProvider>(context, listen: false).addItem(
-                      widget.product,
-                      quantity: _quantity,
-                      startDate: _startDate,
-                      endDate: _endDate,
-                    );
-                    Navigator.pop(context, true);
+                    if (context.mounted) {
+                      Provider.of<CartProvider>(context, listen: false).addItem(
+                        widget.product,
+                        quantity: _quantity,
+                        startDate: _startDate,
+                        endDate: _endDate,
+                      );
+                      Navigator.pop(context, true);
+                    }
                   },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,

@@ -24,6 +24,6 @@ class CartItem {
 
   // Calculate total price in KRW for this item
   double get totalPriceKrw {
-    return (product.priceKrw * rentalDays + product.depositKrw) * quantity;
+    return (product.priceKrw + product.depositKrw) * quantity;
   }
 }

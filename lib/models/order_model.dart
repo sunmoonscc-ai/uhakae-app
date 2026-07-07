@@ -10,6 +10,7 @@ class OrderModel {
   final List<dynamic> items;
   final String status;
   final String? rejectReason;
+  final String? transferRejectReason;
   final DateTime createdAt;
   final bool isTransferNotified;
 
@@ -23,6 +24,7 @@ class OrderModel {
     required this.items,
     required this.status,
     this.rejectReason,
+    this.transferRejectReason,
     required this.createdAt,
     this.isTransferNotified = false,
   });
@@ -39,6 +41,7 @@ class OrderModel {
       items: data['items'] ?? [],
       status: data['status'] ?? 'pending',
       rejectReason: data['rejectReason'],
+      transferRejectReason: data['transferRejectReason'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isTransferNotified: data['isTransferNotified'] ?? false,
     );
@@ -54,6 +57,7 @@ class OrderModel {
       'items': items,
       'status': status,
       'rejectReason': rejectReason,
+      if (transferRejectReason != null) 'transferRejectReason': transferRejectReason,
       'createdAt': Timestamp.fromDate(createdAt),
       'isTransferNotified': isTransferNotified,
     };

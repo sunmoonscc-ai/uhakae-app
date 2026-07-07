@@ -138,7 +138,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
             ),
             const SizedBox(width: 8),
             Text(
-              '유학애 커뮤니티',
+              '커뮤니티',
               style: TextStyle(
                 color: isDarkMode ? Colors.white : Colors.black,
                 fontWeight: FontWeight.bold,

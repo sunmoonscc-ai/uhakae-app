@@ -25,41 +25,32 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
+        backgroundColor: isDarkMode ? Colors.black : Colors.white,
         elevation: 0,
-        title: Row(
-          children: [
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => onNavigateTab?.call(0),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset(
-                        (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
-                        height: 40,
-                        errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '유학애',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : const Color(0xFF0C6780),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 22,
-                        ),
-                      ),
-                    ],
-                  ),
+        title: InkWell(
+          onTap: () {
+            // Scroll to top
+          },
+          child: Container(
+            color: Colors.transparent,
+            child: SizedBox(
+              height: kToolbarHeight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      (Theme.of(context).brightness == Brightness.dark ? 'assets/images/logo_dark.png' : 'assets/images/logo.png'),
+                      height: 40,
+                      errorBuilder: (context, error, stackTrace) => Icon(Icons.school, color: isDarkMode ? Colors.white : Colors.black),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
+          ),
         ),
-
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
@@ -68,24 +59,85 @@ class HomeScreen extends StatelessWidget {
                 stream: FirebaseAuth.instance.authStateChanges(),
                 builder: (context, snapshot) {
                   final user = snapshot.data;
-                  final String name = (user != null && user.displayName != null && user.displayName!.isNotEmpty) 
-                      ? user.displayName! 
-                      : (user != null ? '회원' : '게스트');
-                  return Text(
-                    '안녕하세요, $name님!',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                  return FutureBuilder<DocumentSnapshot>(
+                    future: user != null ? FirebaseFirestore.instance.collection('users').doc(user.uid).get() : Future.value(null),
+                    builder: (context, userSnapshot) {
+                      String name = '게스트';
+                      if (user != null) {
+                        final isAdminEmail = [
+                          'cebufriends79@gmail.com',
+                          'slptas05@gmail.com',
+                          'sunmoon.scc@gmail.com',
+                          'hdcc6th@gmail.com',
+                          'uhakae2026@gmail.com',
+                        ].contains(user?.email);
+
+                        if (isAdminEmail) {
+                          name = '관리자';
+                        } else if (userSnapshot.hasData && userSnapshot.data != null && userSnapshot.data!.exists) {
+                          final data = userSnapshot.data!.data() as Map<String, dynamic>;
+                          final level = data['level'] as String?;
+                          if (level == '관리자' || level == '최고관리자') {
+                            name = '관리자';
+                          } else {
+                            name = (user.displayName != null && user.displayName!.isNotEmpty) ? user.displayName! : '회원';
+                          }
+                        } else {
+                          name = (user.displayName != null && user.displayName!.isNotEmpty) ? user.displayName! : '회원';
+                        }
+                      }
+                      
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (name == '관리자')
+                            StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance.collection('orders').where('status', isEqualTo: 'pending').snapshots(),
+                              builder: (context, orderSnapshot) {
+                                int pendingCount = 0;
+                                if (orderSnapshot.hasData) {
+                                  pendingCount = orderSnapshot.data!.docs.length;
+                                }
+                                if (pendingCount == 0) return const SizedBox.shrink();
+
+                                return InkWell(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const AdminScreen(initialTab: '대시보드')),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.notifications, color: Colors.blue),
+                                        Text('+$pendingCount', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          Text(
+                            '안녕하세요, $name님!',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
                   );
                 },
               ),
             ),
           ),
-          ],
-        ),
-        body: CustomScrollView(
+        ],
+      ),
+      body: CustomScrollView(
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),

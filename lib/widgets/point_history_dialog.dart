@@ -321,7 +321,16 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                   final price = item['totalPriceKrw'] ?? 0;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
-                    child: Text('$name x $quantity\n₩${NumberFormat('#,###').format(price)}', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 14)),
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(text: '$name x $quantity\n'),
+                          const WidgetSpan(child: Padding(padding: EdgeInsets.only(right: 2), child: Icon(Icons.savings, size: 14))),
+                          TextSpan(text: '${NumberFormat('#,###').format(price)}'),
+                        ],
+                      ),
+                      style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 14),
+                    ),
                   );
                 }).toList(),
               ),

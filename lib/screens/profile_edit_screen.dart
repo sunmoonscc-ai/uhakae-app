@@ -5,7 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/preferences_service.dart';
 
 class ProfileEditScreen extends StatefulWidget {
-  const ProfileEditScreen({super.key});
+  final bool isForced;
+  const ProfileEditScreen({super.key, this.isForced = false});
 
   @override
   State<ProfileEditScreen> createState() => _ProfileEditScreenState();
@@ -293,6 +294,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.isForced,
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
         elevation: 0,
         iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.black),

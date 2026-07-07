@@ -204,14 +204,14 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
     );
   }
 
-  void _handleGroupDeductPoints(OrderGroup group, String userDocId) {
+  void _handleGroupApprove(OrderGroup group, String userDocId) {
     _showAutoConfirmDialog(
-      title: '바우처 결제 처리',
-      content: '총액 ₩${NumberFormat('#,###').format(group.totalKrw.toInt())}을 차감하고 배송준비 상태로 변경하시겠습니까?\n(3초 후 자동으로 승인됩니다. 취소하려면 취소 버튼을 누르세요.)',
+      title: '주문 승인 처리',
+      content: '해당 주문을 승인하고 배송준비 상태로 변경하시겠습니까?\n(3초 후 자동으로 승인됩니다. 취소하려면 취소 버튼을 누르세요.)',
       onConfirm: () async {
         bool allSuccess = true;
         for (var order in group.orders) {
-          final success = await _orderService.deductPointsAndPrepare(order.id, userDocId, order.totalKrw);
+          final success = await _orderService.updateOrderStatusByAdmin(order.id, 'preparing');
           if (!success) allSuccess = false;
         }
         if (context.mounted) {
@@ -222,7 +222,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
               context: context,
               builder: (context) => AlertDialog(
                 title: const Text('처리 실패'),
-                content: const Text('해당 사용자의 보유 포인트가 부족하여 결제(차감) 처리에 실패했습니다.\n사용자 관리에서 포인트를 먼저 지급해 주세요.'),
+                content: const Text('주문 상태 변경에 실패했습니다.'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
@@ -742,7 +742,15 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                                                         stockText = ' (재고: ∞)';
                                                       }
                                                     }
-                                                    return Text('- ${item['name']} x ${item['quantity']}$stockText',
+                                                    String dateText = '';
+                                                    if (item['startDate'] != null && item['endDate'] != null) {
+                                                      try {
+                                                        final start = DateTime.parse(item['startDate']);
+                                                        final end = DateTime.parse(item['endDate']);
+                                                        dateText = ' [${DateFormat('MM.dd').format(start)}~${DateFormat('MM.dd').format(end)}]';
+                                                      } catch (_) {}
+                                                    }
+                                                    return Text('- ${item['name']} x ${item['quantity']}$dateText$stockText',
                                                       style: TextStyle(
                                                         color: stockText.contains('재고: -') ? Colors.red : null,
                                                         fontWeight: stockText.contains('재고: -') ? FontWeight.bold : FontWeight.normal,
@@ -750,7 +758,19 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                                                     );
                                                   },
                                                 )
-                                              : Text('- ${item['name']} x ${item['quantity']}'),
+                                              : Builder(
+                                                  builder: (context) {
+                                                    String dateText = '';
+                                                    if (item['startDate'] != null && item['endDate'] != null) {
+                                                      try {
+                                                        final start = DateTime.parse(item['startDate']);
+                                                        final end = DateTime.parse(item['endDate']);
+                                                        dateText = ' [${DateFormat('MM.dd').format(start)}~${DateFormat('MM.dd').format(end)}]';
+                                                      } catch (_) {}
+                                                    }
+                                                    return Text('- ${item['name']} x ${item['quantity']}$dateText');
+                                                  },
+                                                ),
                                         ),
                                     Expanded(
                                       flex: 1,
@@ -954,7 +974,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
                   child: ElevatedButton(
-                    onPressed: isPointPaymentAllowed ? () => _handleGroupDeductPoints(group, userDocId) : null,
+                    onPressed: isPointPaymentAllowed ? () => _handleGroupApprove(group, userDocId) : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,

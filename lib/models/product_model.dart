@@ -8,6 +8,7 @@ class Product {
   final String imageUrl;
   final String description;
   final bool isBankTransferOnly;
+  final int totalQuantity;
 
   Product({
     required this.id,
@@ -19,6 +20,7 @@ class Product {
     required this.imageUrl,
     required this.description,
     this.isBankTransferOnly = false,
+    this.totalQuantity = 999,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class Product {
       imageUrl: json['imageUrl'] ?? '',
       description: json['description'] ?? '',
       isBankTransferOnly: json['isBankTransferOnly'] ?? false,
+      totalQuantity: json['totalQuantity'] ?? 999,
     );
   }
 
@@ -46,6 +49,7 @@ class Product {
       'imageUrl': imageUrl,
       'description': description,
       'isBankTransferOnly': isBankTransferOnly,
+      'totalQuantity': totalQuantity,
     };
   }
 }

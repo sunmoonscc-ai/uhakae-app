@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:async';
 import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 import 'screens/more_menu_sheet.dart';
 import 'screens/shop_screen.dart';
 import 'screens/info_screen.dart';
+import 'screens/profile_edit_screen.dart';
 import 'services/preferences_service.dart';
-import 'widgets/global_upload_indicator.dart';
 import 'utils/time_utils.dart';
-import 'utils/ui_utils.dart';
 import 'package:provider/provider.dart';
 import 'services/cart_provider.dart';
+import 'utils/ui_utils.dart';
+import 'utils/admin_notification_manager.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -114,6 +114,7 @@ class _MainScreenState extends State<MainScreen> {
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<QuerySnapshot>? _adminOrderSubscription;
   bool _isFirstOrderLoad = true;
+  bool _needsProfileUpdate = false;
 
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
     GlobalKey<NavigatorState>(),
@@ -132,6 +133,7 @@ class _MainScreenState extends State<MainScreen> {
         setState(() {
           _customScreen = null;
           _selectedIndex = 0;
+          _needsProfileUpdate = false;
         });
       } else if (user != null && mounted) {
         // 권한 검증 및 로그아웃은 LoginScreen에서 모두 처리하므로, 여기서는 새 알림(개별공지) 체크만 수행합니다.
@@ -146,12 +148,49 @@ class _MainScreenState extends State<MainScreen> {
             final userDoc = result.docs.first;
             final level = userDoc.data()['level'] as String? ?? '정회원';
 
+            final name = userDoc.data()['name'] as String? ?? '';
+            final phoneKr = userDoc.data()['phone_kr'] as String? ?? '';
+            final phonePh = userDoc.data()['phone_ph'] as String? ?? '';
+            final school = userDoc.data()['school'] as String? ?? '';
+            final startDate = userDoc.data()['start_date'] as String? ?? '';
+            final endDate = userDoc.data()['end_date'] as String? ?? '';
+            
+            final isAdminEmail = [
+              'cebufriends79@gmail.com',
+              'slptas05@gmail.com',
+              'sunmoon.scc@gmail.com',
+              'hdcc6th@gmail.com',
+              'uhakae2026@gmail.com',
+            ].contains(user.email);
+            
+            bool isIncomplete = false;
+            if (isAdminEmail) {
+              isIncomplete = name.trim().isEmpty || 
+                             phoneKr.trim().isEmpty || 
+                             phonePh.trim().isEmpty;
+            } else {
+              isIncomplete = name.trim().isEmpty || 
+                             phoneKr.trim().isEmpty || 
+                             phonePh.trim().isEmpty || 
+                             school.trim().isEmpty || 
+                             startDate.trim().isEmpty || 
+                             endDate.trim().isEmpty;
+            }
+
+            if (level == '정회원' && isIncomplete) {
+              setState(() {
+                _needsProfileUpdate = true;
+              });
+            } else {
+              setState(() {
+                _needsProfileUpdate = false;
+              });
+            }
+
             // 승인된 회원인 경우에만 알림 체크 및 일일 포인트 체크
             if (level == '정회원') {
               _checkPersonalNotices(userDoc.id);
               _checkDailyPoints(userDoc);
-            } else if (level == '관리자' || level == '최고관리자') {
-              _listenForNewOrders();
             }
           }
         } catch (e) {
@@ -159,51 +198,6 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
     });
-  }
-
-  void _listenForNewOrders() {
-    _adminOrderSubscription?.cancel();
-    _isFirstOrderLoad = true;
-    _adminOrderSubscription = FirebaseFirestore.instance
-        .collection('orders')
-        .where('status', isEqualTo: 'pending')
-        .snapshots()
-        .listen((snapshot) {
-      if (_isFirstOrderLoad) {
-        _isFirstOrderLoad = false;
-        if (snapshot.docs.isNotEmpty) {
-          _showPendingOrdersDialog(snapshot.docs.length);
-        }
-        return;
-      }
-      
-      int newlyAdded = 0;
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          newlyAdded++;
-        }
-      }
-      if (newlyAdded > 0) {
-        _showPendingOrdersDialog(snapshot.docs.length);
-      }
-    });
-  }
-
-  void _showPendingOrdersDialog(int count) {
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('새로운 주문 알림', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('현재 승인 대기 중인 주문/대여 요청이 $count건 있습니다.\n주문관리 메뉴에서 확인해 주세요.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('확인'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _checkDailyPoints(QueryDocumentSnapshot userDoc) async {
@@ -446,6 +440,10 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_needsProfileUpdate) {
+      return const ProfileEditScreen(isForced: true);
+    }
+
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(

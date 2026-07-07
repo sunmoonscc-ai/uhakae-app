@@ -33,7 +33,35 @@ class ProductCard extends StatelessWidget {
             ),
           );
 
-          if (result == true && context.mounted) {
+          if (result is Product && context.mounted) {
+            final pointCardResult = await showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              useSafeArea: true,
+              builder: (context) => ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.9,
+                  child: ProductDetailScreen(product: result),
+                ),
+              ),
+            );
+
+            if (pointCardResult == true && context.mounted) {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (context) => ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  child: SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.9,
+                    child: const CartScreen(),
+                  ),
+                ),
+              );
+            }
+          } else if (result == true && context.mounted) {
             bool isClosed = false;
             showDialog(
               context: context,

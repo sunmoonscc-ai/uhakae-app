@@ -18,10 +18,12 @@ import '../widgets/admin_shop_management_tab.dart';
 import '../widgets/admin_product_management_tab.dart';
 import '../utils/time_utils.dart';
 import '../services/preferences_service.dart';
+import '../widgets/admin_point_management_dialog.dart';
 
 class AdminScreen extends StatefulWidget {
   final String? initialTab;
-  const AdminScreen({super.key, this.initialTab});
+  final String? initialConciergeSubTab;
+  const AdminScreen({super.key, this.initialTab, this.initialConciergeSubTab});
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -40,6 +42,7 @@ class _AdminScreenState extends State<AdminScreen> {
   String _infoSuggestionStatus = 'pending'; // 'pending' or 'completed'
   String _conciergeSubTab = '대시보드'; // 컨시어지 탭의 서브 탭
   String _adminOrderFilter = 'pending'; // 주문 관리 탭 필터
+  String? _selectedProductId; // 선택된 물품 ID (물품현황 필터링용)
   
   String _adminInfoSortMode = 'name_asc'; // 'name_asc', 'name_desc', 'dist_asc', 'dist_desc'
   bool _adminInfoOpenNowFilter = false;
@@ -69,6 +72,9 @@ class _AdminScreenState extends State<AdminScreen> {
     super.initState();
     if (widget.initialTab != null && _tabs.contains(widget.initialTab)) {
       _selectedTab = widget.initialTab!;
+    }
+    if (widget.initialConciergeSubTab != null) {
+      _conciergeSubTab = widget.initialConciergeSubTab!;
     }
 
     
@@ -196,8 +202,21 @@ class _AdminScreenState extends State<AdminScreen> {
     final int originalPoints = data['points'] ?? 0;
     String? selectedSchool = data['school'];
     
+    final String userEmail = data['email'] ?? '';
+    final bool isAdminEmail = [
+      'cebufriends79@gmail.com',
+      'slptas05@gmail.com',
+      'sunmoon.scc@gmail.com',
+      'hdcc6th@gmail.com',
+      'uhakae2026@gmail.com',
+    ].contains(userEmail);
+
     String selectedLevel = data['level'] ?? '정회원';
-    final List<String> levels = ['정회원', '예비', '연수종료'];
+    if (isAdminEmail) {
+      selectedLevel = '관리자';
+    }
+    
+    final List<String> levels = ['정회원', '예비', '연수종료', '관리자'];
     if (!levels.contains(selectedLevel)) {
       levels.add(selectedLevel);
     }
@@ -291,7 +310,7 @@ class _AdminScreenState extends State<AdminScreen> {
                         value: selectedLevel,
                         decoration: const InputDecoration(labelText: '회원등급'),
                         items: levels.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
-                        onChanged: (val) => setState(() => selectedLevel = val!),
+                        onChanged: isAdminEmail ? null : (val) => setState(() => selectedLevel = val!),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -305,15 +324,15 @@ class _AdminScreenState extends State<AdminScreen> {
                         value: selectedSchool,
                         decoration: const InputDecoration(labelText: '어학원'),
                         items: schools.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                        onChanged: (val) => setState(() => selectedSchool = val),
-                        validator: (val) => val == null ? '어학원을 선택해주세요.' : null,
+                        onChanged: isAdminEmail ? null : (val) => setState(() => selectedSchool = val),
+                        validator: isAdminEmail ? null : (val) => val == null ? '어학원을 선택해주세요.' : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: startDateCtrl,
                         decoration: const InputDecoration(labelText: '연수시작일', hintText: '예: 2026-07-01'),
                         readOnly: true,
-                        onTap: () async {
+                        onTap: isAdminEmail ? null : () async {
                           final picked = await showDatePicker(
                             context: context,
                             initialDate: DateTime.now(),
@@ -326,7 +345,7 @@ class _AdminScreenState extends State<AdminScreen> {
                             });
                           }
                         },
-                        validator: (val) => (val == null || val.trim().isEmpty) ? '연수시작일을 선택해주세요.' : null,
+                        validator: isAdminEmail ? null : (val) => (val == null || val.trim().isEmpty) ? '연수시작일을 선택해주세요.' : null,
                       ),
                     ],
                   ),
@@ -624,6 +643,38 @@ class _AdminScreenState extends State<AdminScreen> {
           ],
         ),
         actions: [
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('orders').where('status', isEqualTo: 'pending').snapshots(),
+            builder: (context, snapshot) {
+              int pendingCount = 0;
+              if (snapshot.hasData) {
+                pendingCount = snapshot.data!.docs.length;
+              }
+              if (pendingCount == 0) return const SizedBox.shrink();
+
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedTab = '대시보드';
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.notifications_active, color: Colors.blueAccent),
+                      const SizedBox(width: 4),
+                      Text(
+                        '+$pendingCount',
+                        style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
           ValueListenableBuilder<List<Map<String, dynamic>>>(
             valueListenable: PreferencesService.favoritesNotifier,
             builder: (context, favorites, _) {
@@ -1098,8 +1149,8 @@ class _AdminScreenState extends State<AdminScreen> {
                 : _conciergeSubTab == '주문관리'
                     ? AdminShopManagementTab(initialFilter: _adminOrderFilter)
                     : _conciergeSubTab == '판매관리'
-                        ? const AdminProductManagementTab(productType: 'buy')
-                        : const AdminProductManagementTab(productType: 'rent'),
+                        ? AdminProductManagementTab(productType: 'buy', initialProductId: _selectedProductId)
+                        : AdminProductManagementTab(productType: 'rent', initialProductId: _selectedProductId),
           ),
         ],
       );
@@ -1621,8 +1672,15 @@ class _AdminScreenState extends State<AdminScreen> {
           return true;
         }).toList();
 
-        // 정렬 공통 로직
-        var modifiableDocs = List<QueryDocumentSnapshot>.from(docs);
+        var rawDocs = snapshot.data!.docs;
+        var filteredDocs = rawDocs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final email = data['email'];
+          final name = data['name'];
+          return email != null && email.toString().isNotEmpty && name != null && name.toString().isNotEmpty;
+        }).toList();
+        
+        var modifiableDocs = List<QueryDocumentSnapshot>.from(filteredDocs);
         modifiableDocs.sort((a, b) {
           final aMap = a.data() as Map<String, dynamic>;
           final bMap = b.data() as Map<String, dynamic>;
@@ -1803,8 +1861,20 @@ class _AdminScreenState extends State<AdminScreen> {
                       final name = data['name'] ?? '이름 없음';
                       final phoneKr = data['phone_kr'] ?? '';
                       final phonePh = data['phone_ph'] ?? '';
+                      
+                      final String email = data['email'] ?? '';
+                      final bool isAdminUser = [
+                        'cebufriends79@gmail.com',
+                        'slptas05@gmail.com',
+                        'sunmoon.scc@gmail.com',
+                        'hdcc6th@gmail.com',
+                        'uhakae2026@gmail.com',
+                      ].contains(email);
+
                       String displaySchool = data['school'] ?? '소속 미정';
-                      if (_userAdminRegion != '전체' && displaySchool.startsWith('${_userAdminRegion}_')) {
+                      if (isAdminUser) {
+                        displaySchool = '관리자';
+                      } else if (_userAdminRegion != '전체' && displaySchool.startsWith('${_userAdminRegion}_')) {
                         displaySchool = displaySchool.replaceFirst('${_userAdminRegion}_', '');
                       }
                       final startDate = data['start_date'] ?? '미정';
@@ -1867,11 +1937,30 @@ class _AdminScreenState extends State<AdminScreen> {
                                 ),
                                 Expanded(
                                   flex: 4,
-                                  child: Text(
-                                    startDate,
-                                    style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54, fontSize: 13),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          startDate,
+                                          style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54, fontSize: 13),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) => AdminPointManagementDialog(userDoc: doc),
+                                          );
+                                        },
+                                        child: const Padding(
+                                          padding: EdgeInsets.only(left: 4.0),
+                                          child: Icon(Icons.savings, color: Colors.pinkAccent, size: 18),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 SizedBox(
@@ -2977,7 +3066,57 @@ class _AdminScreenState extends State<AdminScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('주문 처리 현황', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('주문 처리 현황', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              TextButton.icon(
+                                icon: const Icon(Icons.refresh, size: 16, color: Colors.red),
+                                label: const Text('초기화', style: TextStyle(color: Colors.red)),
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('초기화 확인'),
+                                      content: const Text('모든 사용자의 주문 및 대여 기록을 완전히 삭제합니다.\n이 작업은 되돌릴 수 없습니다. 진행하시겠습니까?'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                          child: const Text('삭제'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  
+                                  if (confirm == true) {
+                                    final snapshots = await FirebaseFirestore.instance.collection('orders').get();
+                                    
+                                    // Use a loop to delete in chunks since batch has a limit of 500, though testing usually has fewer.
+                                    var batch = FirebaseFirestore.instance.batch();
+                                    int count = 0;
+                                    for (var doc in snapshots.docs) {
+                                      batch.delete(doc.reference);
+                                      count++;
+                                      if (count == 400) {
+                                        await batch.commit();
+                                        batch = FirebaseFirestore.instance.batch();
+                                        count = 0;
+                                      }
+                                    }
+                                    if (count > 0) {
+                                      await batch.commit();
+                                    }
+                                    
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('모든 주문 기록이 초기화되었습니다.')));
+                                    }
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
                           const Divider(),
                           Row(
                             children: [
@@ -3018,12 +3157,16 @@ class _AdminScreenState extends State<AdminScreen> {
                       
                       return Column(
                         children: [
-                          _buildProductListCard('판매 물품 현황', buyProducts, itemActiveCount, isDarkMode, onTapItem: () {
-                            setState(() { _conciergeSubTab = '판매관리'; });
+                          _buildProductListCard('판매 물품 현황', buyProducts, itemActiveCount, isDarkMode, onTapTitle: () {
+                            setState(() { _conciergeSubTab = '판매관리'; _selectedProductId = null; });
+                          }, onTapItem: (docId) {
+                            setState(() { _conciergeSubTab = '판매관리'; _selectedProductId = docId; });
                           }),
                           const SizedBox(height: 16),
-                          _buildProductListCard('대여 물품 현황', rentProducts, itemActiveCount, isDarkMode, onTapItem: () {
-                            setState(() { _conciergeSubTab = '대여관리'; });
+                          _buildProductListCard('대여 물품 현황', rentProducts, itemActiveCount, isDarkMode, onTapTitle: () {
+                            setState(() { _conciergeSubTab = '대여관리'; _selectedProductId = null; });
+                          }, onTapItem: (docId) {
+                            setState(() { _conciergeSubTab = '대여관리'; _selectedProductId = docId; });
                           }),
                         ],
                       );
@@ -3038,7 +3181,7 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  Widget _buildProductListCard(String title, List<QueryDocumentSnapshot> products, Map<String, int> activeCounts, bool isDarkMode, {VoidCallback? onTapItem}) {
+  Widget _buildProductListCard(String title, List<QueryDocumentSnapshot> products, Map<String, int> activeCounts, bool isDarkMode, {VoidCallback? onTapTitle, void Function(String)? onTapItem}) {
     String sortColumn = '물품명';
     bool sortAscending = true;
 
@@ -3099,7 +3242,10 @@ class _AdminScreenState extends State<AdminScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                InkWell(
+                  onTap: onTapTitle,
+                  child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
                 const Divider(),
                 if (products.isEmpty)
                   const Padding(
@@ -3139,7 +3285,7 @@ class _AdminScreenState extends State<AdminScreen> {
                           final isInfinite = totalQuantity == 0;
 
                           return InkWell(
-                            onTap: onTapItem,
+                            onTap: onTapItem != null ? () => onTapItem(doc.id) : null,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
                               child: Row(
