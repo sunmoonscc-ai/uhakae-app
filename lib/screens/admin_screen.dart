@@ -44,7 +44,7 @@ class _AdminScreenState extends State<AdminScreen> {
   String _adminInfoRegion = '바기오'; // 정보 관리 탭 지역
   String _adminInfoSubCategory = '전체'; // 정보 관리 탭 카테고리
   String _infoSuggestionStatus = 'pending'; // 'pending' or 'completed'
-  String _conciergeSubTab = '대시보드'; // 컨시어지 탭의 서브 탭
+  String _conciergeSubTab = '현황'; // 컨시어지 탭의 서브 탭
   String _adminOrderFilter = 'pending'; // 주문 관리 탭 필터
   String? _selectedProductId; // 선택된 물품 ID (물품현황 필터링용)
   
@@ -922,18 +922,22 @@ class _AdminScreenState extends State<AdminScreen> {
                       return InkWell(
                         onTap: () {
                           setState(() {
-                            if (userSnapshot.hasData && userSnapshot.data!.docs.isNotEmpty) {
-                              _selectedTab = '사용자';
-                              _userAdminSubTab = '신청자';
-                            } else if (orderSnapshot.hasData && orderSnapshot.data!.docs.isNotEmpty) {
-                              _selectedTab = '컨시어지';
-                              _conciergeSubTab = '주문관리';
-                              _adminOrderFilter = 'pending';
-                            } else if (infoSnapshot.hasData && infoSnapshot.data!.docs.isNotEmpty) {
-                              _selectedTab = '정보';
-                              _infoSuggestionStatus = 'pending';
-                            } else {
+                            if (pendingCount >= 2) {
                               _selectedTab = '대시보드';
+                            } else {
+                              if (userSnapshot.hasData && userSnapshot.data!.docs.isNotEmpty) {
+                                _selectedTab = '사용자';
+                                _userAdminSubTab = '신청자';
+                              } else if (orderSnapshot.hasData && orderSnapshot.data!.docs.isNotEmpty) {
+                                _selectedTab = '컨시어지';
+                                _conciergeSubTab = '주문관리';
+                                _adminOrderFilter = 'pending';
+                              } else if (infoSnapshot.hasData && infoSnapshot.data!.docs.isNotEmpty) {
+                                _selectedTab = '정보';
+                                _infoSuggestionStatus = 'pending';
+                              } else {
+                                _selectedTab = '대시보드';
+                              }
                             }
                           });
                         },
@@ -1433,7 +1437,7 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
             child: Row(
               children: [
-                _buildConciergeSubTabItem('대시보드', isDarkMode),
+                _buildConciergeSubTabItem('현황', isDarkMode),
                 _buildConciergeSubTabItem('주문관리', isDarkMode),
                 _buildConciergeSubTabItem('판매관리', isDarkMode),
                 _buildConciergeSubTabItem('대여관리', isDarkMode),
@@ -1442,7 +1446,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           // 컨텐츠 영역
           Expanded(
-            child: _conciergeSubTab == '대시보드'
+            child: _conciergeSubTab == '현황'
                 ? _buildConciergeDashboard(isDarkMode)
                 : _conciergeSubTab == '주문관리'
                     ? AdminShopManagementTab(initialFilter: _adminOrderFilter)

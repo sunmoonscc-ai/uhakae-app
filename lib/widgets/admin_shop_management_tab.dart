@@ -762,10 +762,13 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                                                         dateText = ' [${DateFormat('MM.dd').format(start)}~${DateFormat('MM.dd').format(end)}]';
                                                       } catch (_) {}
                                                     }
-                                                    return Text('- ${item['name']} x ${item['quantity']}$dateText$stockText',
+                                                    
+                                                    String rejectText = itemStatus == 'rejected' ? ' (거절됨: ${item['rejectReason'] ?? '사유 없음'})' : '';
+                                                    return Text('- ${item['name']} x ${item['quantity']}$dateText$stockText$rejectText',
                                                       style: TextStyle(
-                                                        color: stockText.contains('재고: -') ? Colors.red : null,
-                                                        fontWeight: stockText.contains('재고: -') ? FontWeight.bold : FontWeight.normal,
+                                                        color: itemStatus == 'rejected' ? Colors.grey : (stockText.contains('재고: -') ? Colors.red : null),
+                                                        fontWeight: stockText.contains('재고: -') && itemStatus != 'rejected' ? FontWeight.bold : FontWeight.normal,
+                                                        decoration: itemStatus == 'rejected' ? TextDecoration.lineThrough : null,
                                                       ),
                                                     );
                                                   },
@@ -780,7 +783,14 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                                                         dateText = ' [${DateFormat('MM.dd').format(start)}~${DateFormat('MM.dd').format(end)}]';
                                                       } catch (_) {}
                                                     }
-                                                    return Text('- ${item['name']} x ${item['quantity']}$dateText');
+                                                    
+                                                    String rejectText = itemStatus == 'rejected' ? ' (거절됨: ${item['rejectReason'] ?? '사유 없음'})' : '';
+                                                    return Text('- ${item['name']} x ${item['quantity']}$dateText$rejectText',
+                                                      style: TextStyle(
+                                                        color: itemStatus == 'rejected' ? Colors.grey : null,
+                                                        decoration: itemStatus == 'rejected' ? TextDecoration.lineThrough : null,
+                                                      ),
+                                                    );
                                                   },
                                                 ),
                                         ),

@@ -178,6 +178,17 @@ class ProductCard extends StatelessWidget {
                           ),
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      product.totalQuantity == 999 
+                          ? '재고: 무제한' 
+                          : '재고: ${product.totalQuantity}개',
+                      style: TextStyle(
+                        fontSize: 12, 
+                        color: product.totalQuantity > 0 ? Colors.green[700] : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),

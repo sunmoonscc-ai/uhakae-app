@@ -144,34 +144,57 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
         ),
         actions: [
           const AdminNotificationBadge(),
-          InkWell(
-            onTap: () {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                useSafeArea: true,
-                builder: (context) => ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                  child: SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.9,
-                    child: const OrderHistoryScreen(),
-                  ),
-                ),
+          StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, userSnapshot) {
+              final user = userSnapshot.data;
+              return StreamBuilder<QuerySnapshot>(
+                stream: user != null
+                    ? FirebaseFirestore.instance
+                        .collection('orders')
+                        .where('userId', isEqualTo: user.uid)
+                        .where('status', whereIn: ['pending', 'approved'])
+                        .limit(1)
+                        .snapshots()
+                    : null,
+                builder: (context, orderSnapshot) {
+                  bool hasActiveOrder = orderSnapshot.hasData && orderSnapshot.data!.docs.isNotEmpty;
+                  Color iconColor = hasActiveOrder 
+                      ? Colors.green 
+                      : (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black);
+                  
+                  return InkWell(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        builder: (context) => ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                          child: SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.9,
+                            child: const OrderHistoryScreen(),
+                          ),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                      child: Row(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(2.0),
+                            child: Icon(Icons.receipt_long, color: iconColor),
+                          ),
+                          const SizedBox(width: 2),
+                          Text('주문내역', style: TextStyle(color: iconColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               );
             },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2.0),
-              child: Row(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.all(2.0),
-                    child: Icon(Icons.receipt_long, color: Colors.black),
-                  ),
-                  const SizedBox(width: 2),
-                  const Text('주문내역', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
-                ],
-              ),
-            ),
           ),
           // 1. 장바구니 (Icon + Badge)
           InkWell(

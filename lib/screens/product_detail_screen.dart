@@ -7,6 +7,7 @@ import 'package:study_abroad_app/services/cart_provider.dart';
 import 'package:study_abroad_app/screens/cart_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:study_abroad_app/utils/ui_utils.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -122,6 +123,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Row(
                     children: [
                       const Text('수량', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      if (widget.product.totalQuantity == 999) ...[
+                        const SizedBox(width: 8),
+                        Text('(재고: 무제한)', style: TextStyle(fontSize: 14, color: Colors.green[700], fontWeight: FontWeight.bold)),
+                      ] else ...[
+                        const SizedBox(width: 8),
+                        Text('(재고: ${widget.product.totalQuantity}개)', 
+                          style: TextStyle(
+                            fontSize: 14, 
+                            color: widget.product.totalQuantity > 0 ? Colors.green[700] : Colors.red, 
+                            fontWeight: FontWeight.bold
+                          )
+                        ),
+                      ],
                       const Spacer(),
                       IconButton(
                         icon: const Icon(Icons.remove_circle_outline),
@@ -381,7 +395,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                         }
                                       } else {
                                         if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('포인트 카드를 찾을 수 없습니다.')));
+                                          UiUtils.showPopup(context, '포인트 카드를 찾을 수 없습니다.');
                                         }
                                       }
                                     },

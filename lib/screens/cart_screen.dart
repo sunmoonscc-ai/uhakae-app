@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:study_abroad_app/services/cart_provider.dart';
 import 'package:study_abroad_app/services/order_service.dart';
+import 'package:study_abroad_app/utils/ui_utils.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -68,9 +69,9 @@ class _CartScreenState extends State<CartScreen> {
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('주문 전송에 실패했습니다. 다시 시도해주세요.')),
-      );
+      if (context.mounted) {
+        UiUtils.showPopup(context, '주문 전송에 실패했습니다. 다시 시도해주세요.');
+      }
     }
   }
 

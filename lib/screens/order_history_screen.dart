@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:study_abroad_app/models/order_model.dart';
 import 'package:study_abroad_app/services/order_service.dart';
+import 'package:study_abroad_app/utils/ui_utils.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   const OrderHistoryScreen({super.key});
@@ -173,11 +174,21 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                         title: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: order.items.map<Widget>((item) {
+                            final itemStatus = item['status'] ?? 'pending';
+                            final isRejected = itemStatus == 'rejected';
+                            final rejectReason = item['rejectReason'] ?? '사유 없음';
+                            final rejectText = isRejected ? ' (거절됨: $rejectReason)' : '';
+
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 4.0),
                               child: Text(
-                                '${item['name']} x ${item['quantity']}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                '${item['name']} x ${item['quantity']}$rejectText',
+                                style: TextStyle(
+                                  fontWeight: isRejected ? FontWeight.normal : FontWeight.bold, 
+                                  fontSize: 14,
+                                  color: isRejected ? Colors.grey : null,
+                                  decoration: isRejected ? TextDecoration.lineThrough : null,
+                                ),
                               ),
                             );
                           }).toList(),
@@ -253,7 +264,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                   ElevatedButton(
                                     onPressed: () {
                                       _orderService.notifyBankTransfer(order.id);
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('관리자에게 송금 완료 알림이 전송되었습니다.')));
+                                      if (context.mounted) {
+                                        UiUtils.showPopup(context, '관리자에게 송금 완료 알림이 전송되었습니다.');
+                                      }
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.blue,
@@ -360,6 +373,11 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   ),
                   const SizedBox(height: 16),
                   ...order.items.map((item) {
+                    final itemStatus = item['status'] ?? 'pending';
+                    final isRejected = itemStatus == 'rejected';
+                    final rejectReason = item['rejectReason'] ?? '사유 없음';
+                    final rejectText = isRejected ? ' (거절됨: $rejectReason)' : '';
+
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8.0),
                       child: Row(
@@ -367,16 +385,26 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              '${item['name']} x ${item['quantity']}',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              '${item['name']} x ${item['quantity']}$rejectText',
+                              style: TextStyle(
+                                fontWeight: isRejected ? FontWeight.normal : FontWeight.bold,
+                                color: isRejected ? Colors.grey : null,
+                                decoration: isRejected ? TextDecoration.lineThrough : null,
+                              ),
                             ),
                           ),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.savings, size: 14),
+                              Icon(Icons.savings, size: 14, color: isRejected ? Colors.grey : null),
                               const SizedBox(width: 2),
-                              Text('${currencyFormatter.format(item['totalPriceKrw'] ?? item['totalPricePhp'] ?? 0)}'),
+                              Text(
+                                '${currencyFormatter.format(item['totalPriceKrw'] ?? item['totalPricePhp'] ?? 0)}',
+                                style: TextStyle(
+                                  color: isRejected ? Colors.grey : null,
+                                  decoration: isRejected ? TextDecoration.lineThrough : null,
+                                ),
+                              ),
                             ],
                           ),
                         ],
