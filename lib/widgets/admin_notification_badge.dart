@@ -49,31 +49,37 @@ class AdminNotificationBadge extends StatelessWidget {
                 return StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance.collection('info_suggestions').where('status', isEqualTo: 'pending').snapshots(),
                   builder: (context, infoSnapshot) {
-                    int pendingCount = 0;
-                    if (orderSnapshot.hasData) pendingCount += orderSnapshot.data!.docs.length;
-                    if (userSnapshot.hasData) pendingCount += userSnapshot.data!.docs.length;
-                    if (infoSnapshot.hasData) pendingCount += infoSnapshot.data!.docs.length;
+                    return StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance.collection('orders').where('hasUnreadReturnRequest', isEqualTo: true).snapshots(),
+                      builder: (context, returnSnapshot) {
+                        int pendingCount = 0;
+                        if (orderSnapshot.hasData) pendingCount += orderSnapshot.data!.docs.length;
+                        if (userSnapshot.hasData) pendingCount += userSnapshot.data!.docs.length;
+                        if (infoSnapshot.hasData) pendingCount += infoSnapshot.data!.docs.length;
+                        if (returnSnapshot.hasData) pendingCount += returnSnapshot.data!.docs.length;
 
-                    if (pendingCount == 0) return const SizedBox.shrink();
+                        if (pendingCount == 0) return const SizedBox.shrink();
 
-                    return InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const AdminScreen(initialTab: '대시보드')),
+                        return InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const AdminScreen(initialTab: '대시보드')),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.notifications_active, color: iconColor),
+                                const SizedBox(width: 4),
+                                Text('+$pendingCount', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
                         );
                       },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.notifications_active, color: iconColor),
-                            const SizedBox(width: 4),
-                            Text('+$pendingCount', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
                     );
                   },
                 );

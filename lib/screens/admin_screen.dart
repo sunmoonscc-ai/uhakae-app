@@ -1584,7 +1584,8 @@ class _AdminScreenState extends State<AdminScreen> {
               for (var doc in snapshot.data!.docs) {
                 final orderData = doc.data() as Map<String, dynamic>;
                 final items = List<dynamic>.from(orderData['items'] ?? []);
-                for (var item in items) {
+                for (int i = 0; i < items.length; i++) {
+                  final item = items[i];
                   final status = item['returnStatus'];
                   if (item['type'] == 'rent' && status != null) {
                     returnRequestedItems.add({
@@ -1593,6 +1594,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       'userSchool': orderData['userSchool'] ?? '알 수 없음',
                       'createdAt': orderData['createdAt'],
                       'item': item,
+                      'itemIndex': i,
                     });
                   }
                 }
@@ -1630,19 +1632,11 @@ class _AdminScreenState extends State<AdminScreen> {
                           if (returnStatus == 'return_requested')
                             ElevatedButton(
                               onPressed: () async {
-                                await OrderService().updateItemReturnStatus(data['orderId'], item['productId'], 'return_confirmed');
+                                await OrderService().updateItemReturnStatus(data['orderId'], data['itemIndex'], 'return_confirmed');
                               },
                               child: const Text('접수'),
                             ),
-                          if (returnStatus == 'return_confirmed' || returnStatus == 'return_preparing')
-                            ElevatedButton(
-                              onPressed: () async {
-                                await OrderService().updateItemReturnStatus(data['orderId'], item['productId'], 'admin_received');
-                              },
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-                              child: const Text('관리자 회수'),
-                            ),
-                          if (returnStatus == 'user_returned') ...[
+                          if (returnStatus == 'return_confirmed' || returnStatus == 'return_preparing' || returnStatus == 'user_returned' || returnStatus == 'admin_received') ...[
                             ElevatedButton(
                               onPressed: () {
                                 final deposit = item['depositKrw'] ?? 0;
@@ -1650,7 +1644,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                   title: '정상 수령 확인',
                                   content: '재고현황에 반영하고 보증금(${deposit}원)을 반납하겠습니다.',
                                   onConfirm: () async {
-                                    await OrderService().updateItemReturnStatus(data['orderId'], item['productId'], 'returned');
+                                    await OrderService().updateItemReturnStatus(data['orderId'], data['itemIndex'], 'returned');
                                   },
                                 );
                               },
@@ -1665,7 +1659,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                   title: '파손 처리 확인',
                                   content: '재고현황에 반영하고 보증금(${deposit}원)은 미반납입니다.',
                                   onConfirm: () async {
-                                    await OrderService().updateItemReturnStatus(data['orderId'], item['productId'], 'returned_damaged');
+                                    await OrderService().updateItemReturnStatus(data['orderId'], data['itemIndex'], 'returned_damaged');
                                   },
                                 );
                               },
@@ -1673,6 +1667,22 @@ class _AdminScreenState extends State<AdminScreen> {
                               child: const Text('파손 처리'),
                             ),
                           ],
+                          if (returnStatus == 'returned' || returnStatus == 'returned_damaged')
+                            Builder(
+                              builder: (context) {
+                                String dateText = '';
+                                if (item['returnCompletedAt'] != null) {
+                                  try {
+                                    final dt = DateTime.parse(item['returnCompletedAt']).toLocal();
+                                    dateText = '${dt.year}년 ${dt.month}월 ${dt.day}일 ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} ';
+                                  } catch (_) {}
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: Text('$dateText완료', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                                );
+                              }
+                            ),
                         ],
                       ),
                     ),

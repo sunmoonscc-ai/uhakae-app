@@ -614,7 +614,7 @@ class OrderService {
   }
 
   // 6. Request return for a specific rental item
-  Future<bool> requestReturnForItem(String orderId, String productId) async {
+  Future<bool> requestReturnForItem(String orderId, int itemIndex, int returnQty) async {
     try {
       return await _firestore.runTransaction((transaction) async {
         final orderRef = _firestore.collection('orders').doc(orderId);
@@ -625,17 +625,35 @@ class OrderService {
         final items = List<dynamic>.from(orderData['items'] ?? []);
         bool updated = false;
         
-        for (int i = 0; i < items.length; i++) {
-          final item = Map<String, dynamic>.from(items[i]);
-          if (item['productId'] == productId && item['type'] == 'rent' && item['returnStatus'] != 'returned') {
-            item['returnStatus'] = 'return_requested';
-            items[i] = item;
+        if (itemIndex >= 0 && itemIndex < items.length) {
+          final item = Map<String, dynamic>.from(items[itemIndex]);
+          if (item['type'] == 'rent' && item['returnStatus'] != 'returned') {
+            final currentQty = (item['quantity'] ?? 1) as int;
+            
+            if (returnQty >= currentQty) {
+              item['returnStatus'] = 'return_requested';
+              items[itemIndex] = item;
+            } else {
+              item['quantity'] = currentQty - returnQty;
+              final unitPrice = ((item['totalPriceKrw'] ?? 0) as num).toDouble() / currentQty;
+              item['totalPriceKrw'] = unitPrice * (currentQty - returnQty);
+              items[itemIndex] = item;
+              
+              final returnItem = Map<String, dynamic>.from(item);
+              returnItem['quantity'] = returnQty;
+              returnItem['totalPriceKrw'] = unitPrice * returnQty;
+              returnItem['returnStatus'] = 'return_requested';
+              items.insert(itemIndex + 1, returnItem);
+            }
             updated = true;
           }
         }
         
         if (updated) {
-          transaction.update(orderRef, {'items': items});
+          transaction.update(orderRef, {
+            'items': items,
+            'hasUnreadReturnRequest': true,
+          });
         }
         return updated;
       });
@@ -645,9 +663,51 @@ class OrderService {
     }
   }
 
-  // 7. Update return status for a rental item (User & Admin)
-  Future<bool> updateItemReturnStatus(String orderId, String productId, String newReturnStatus) async {
+  // 6.5. Cancel return request for a specific rental item
+  Future<bool> cancelReturnRequest(String orderId, int itemIndex) async {
     try {
+      return await _firestore.runTransaction((transaction) async {
+        final orderRef = _firestore.collection('orders').doc(orderId);
+        final freshSnap = await transaction.get(orderRef);
+        if (!freshSnap.exists) return false;
+        
+        final orderData = freshSnap.data() as Map<String, dynamic>;
+        final items = List<dynamic>.from(orderData['items'] ?? []);
+        bool updated = false;
+        
+        if (itemIndex >= 0 && itemIndex < items.length) {
+          final item = Map<String, dynamic>.from(items[itemIndex]);
+          if (item['type'] == 'rent' && item['returnStatus'] == 'return_requested') {
+            item.remove('returnStatus');
+            items[itemIndex] = item;
+            updated = true;
+          }
+        }
+        
+        if (updated) {
+          bool stillHasUnread = items.any((item) => item['returnStatus'] == 'return_requested');
+          transaction.update(orderRef, {
+            'items': items,
+            if (!stillHasUnread) 'hasUnreadReturnRequest': FieldValue.delete(),
+          });
+        }
+        return updated;
+      });
+    } catch (e) {
+      print('Error canceling return request: $e');
+      return false;
+    }
+  }
+
+  // 7. Update return status for a rental item (User & Admin)
+  Future<bool> updateItemReturnStatus(String orderId, int itemIndex, String newReturnStatus) async {
+    try {
+      final orderSnapForEmail = await _firestore.collection('orders').doc(orderId).get();
+      if (!orderSnapForEmail.exists) return false;
+      
+      final orderDataOutside = orderSnapForEmail.data() as Map<String, dynamic>;
+      final userDocId = orderDataOutside['userId'];
+
       return await _firestore.runTransaction((transaction) async {
         final orderRef = _firestore.collection('orders').doc(orderId);
         final freshSnap = await transaction.get(orderRef);
@@ -658,12 +718,17 @@ class OrderService {
         bool updated = false;
         int qtyToRestore = 0;
         double depositRefund = 0;
+        String? productId;
         
-        for (int i = 0; i < items.length; i++) {
-          final item = Map<String, dynamic>.from(items[i]);
-          if (item['productId'] == productId && item['type'] == 'rent') {
+        if (itemIndex >= 0 && itemIndex < items.length) {
+          final item = Map<String, dynamic>.from(items[itemIndex]);
+          if (item['type'] == 'rent') {
+            productId = item['productId'];
             item['returnStatus'] = newReturnStatus;
-            items[i] = item;
+            if (newReturnStatus == 'returned' || newReturnStatus == 'returned_damaged') {
+              item['returnCompletedAt'] = DateTime.now().toIso8601String();
+            }
+            items[itemIndex] = item;
             updated = true;
             if (newReturnStatus == 'returned' || newReturnStatus == 'returned_damaged') {
               qtyToRestore = item['quantity'] ?? 1;
@@ -675,51 +740,56 @@ class OrderService {
           }
         }
         
-        if (updated) {
-          transaction.update(orderRef, {'items': items});
-          
+        if (!updated) return false;
+        
+        // All Reads must happen before Writes
+        DocumentSnapshot? productSnap;
+        DocumentReference? productRef;
+        if (productId != null) {
+          productRef = _firestore.collection('shop_items').doc(productId);
           if ((newReturnStatus == 'returned' || newReturnStatus == 'returned_damaged') && qtyToRestore > 0) {
-            final productRef = _firestore.collection('products').doc(productId);
-            final productSnap = await transaction.get(productRef);
-            if (productSnap.exists) {
-              final currentQty = (productSnap.data() as Map<String, dynamic>)['totalQuantity'] ?? 999;
-              if (currentQty != 999) {
-                transaction.update(productRef, {
-                  'totalQuantity': FieldValue.increment(qtyToRestore),
-                });
-              }
-            }
-            
-            if (depositRefund > 0) {
-              final userEmail = orderData['userEmail'];
-              if (userEmail != null) {
-                final userQuery = await _firestore.collection('users').where('email', isEqualTo: userEmail).limit(1).get();
-                if (userQuery.docs.isNotEmpty) {
-                  final userDocId = userQuery.docs.first.id;
-                  final userRef = _firestore.collection('users').doc(userDocId);
-                  
-                  transaction.update(userRef, {
-                    'points': FieldValue.increment(depositRefund),
-                  });
-
-                  final historyRef = _firestore.collection('point_history').doc();
-                  transaction.set(historyRef, {
-                    'userId': userDocId,
-                    'amount': depositRefund,
-                    'type': 'deposit_refund',
-                    'description': '물품 정상 반납 보증금 환불',
-                    'orderId': orderId,
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-                }
-              }
-            }
+            productSnap = await transaction.get(productRef);
           }
         }
-        return updated;
+        
+        // Now perform Writes
+        bool stillHasUnread = items.any((item) => item['returnStatus'] == 'return_requested');
+        
+        transaction.update(orderRef, {
+          'items': items,
+          if (!stillHasUnread) 'hasUnreadReturnRequest': FieldValue.delete(),
+        });
+        
+        if (productSnap != null && productSnap.exists) {
+          final currentQty = (productSnap.data() as Map<String, dynamic>)['totalQuantity'] ?? 999;
+          if (currentQty != 999) {
+            transaction.update(productRef!, {
+              'totalQuantity': FieldValue.increment(qtyToRestore),
+            });
+          }
+        }
+        
+        if (depositRefund > 0 && userDocId != null) {
+          final userRef = _firestore.collection('users').doc(userDocId);
+          transaction.update(userRef, {
+            'points': FieldValue.increment(depositRefund),
+          });
+
+          final historyRef = _firestore.collection('point_history').doc();
+          transaction.set(historyRef, {
+            'userId': userDocId,
+            'amount': depositRefund,
+            'type': 'deposit_refund',
+            'description': '물품 정상 반납 보증금 환불',
+            'orderId': orderId,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+        
+        return true;
       });
     } catch (e) {
-      print('Error updating return status: $e');
+      print('Error updating item return status: $e');
       return false;
     }
   }

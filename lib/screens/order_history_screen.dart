@@ -15,44 +15,78 @@ class OrderHistoryScreen extends StatefulWidget {
 class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   final OrderService _orderService = OrderService();
 
-  Future<void> _requestReturn(String orderId, Map<String, dynamic> item) async {
+  Future<void> _requestReturn(String orderId, int itemIndex, Map<String, dynamic> item) async {
+    int returnQty = 1;
+    final maxQty = (item['quantity'] ?? 1) as int;
+
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('반납 요청'),
-        content: Text('${item['name']} 물품의 반납을 요청하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('취소', style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              final bool success = await _orderService.requestReturnForItem(orderId, item['productId']);
-              if (mounted) {
-                if (success) {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('요청 접수 완료'),
-                      content: const Text('반납 요청이 정상적으로 접수되었습니다.\n관리자 확인 후 회수가 진행됩니다.'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('확인')),
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('반납 요청'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${item['name']} 물품의 반납을 요청하시겠습니까?'),
+                  if (maxQty > 1) ...[
+                    const SizedBox(height: 16),
+                    const Text('반납할 수량을 선택해주세요:'),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          onPressed: returnQty > 1 ? () => setState(() => returnQty--) : null,
+                          icon: const Icon(Icons.remove_circle_outline),
+                        ),
+                        Text('$returnQty', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        IconButton(
+                          onPressed: returnQty < maxQty ? () => setState(() => returnQty++) : null,
+                          icon: const Icon(Icons.add_circle_outline),
+                        ),
                       ],
                     ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('반납 요청 처리에 실패했습니다.')),
-                  );
-                }
-              }
-            },
-            child: const Text('반납 요청', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('취소', style: TextStyle(color: Colors.grey)),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    Navigator.pop(dialogContext);
+                    final bool success = await _orderService.requestReturnForItem(orderId, itemIndex, returnQty);
+                    if (mounted) {
+                      if (success) {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('요청 접수 완료'),
+                            content: const Text('반납 요청이 정상적으로 접수되었습니다.\n관리자 확인 후 회수가 진행됩니다.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context), child: const Text('확인')),
+                            ],
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('반납 요청 처리에 실패했습니다.')),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('요청하기', style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -218,7 +252,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         title: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: order.items.map<Widget>((item) {
+                          children: order.items.asMap().entries.map<Widget>((entry) {
+                            final index = entry.key;
+                            final item = entry.value;
                             final itemStatus = item['status'] ?? 'pending';
                             final isRejected = itemStatus == 'rejected';
                             final rejectReason = item['rejectReason'] ?? '사유 없음';
@@ -229,7 +265,39 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                             Widget returnUi = const SizedBox.shrink();
                             if (isRentingTab && item['type'] == 'rent' && returnStatus != 'returned' && returnStatus != 'returned_damaged') {
                               if (returnStatus == 'return_requested') {
-                                returnUi = const Text(' [반납요청됨]', style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold));
+                                returnUi = Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(' [반납요청됨]', style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 4),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text('반납 요청 취소'),
+                                            content: const Text('반납 요청을 취소하시겠습니까?'),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text('아니오', style: TextStyle(color: Colors.grey))),
+                                              TextButton(
+                                                onPressed: () {
+                                                  Navigator.pop(context);
+                                                  _orderService.cancelReturnRequest(order.id, index);
+                                                },
+                                                child: const Text('예', style: TextStyle(color: Colors.red)),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                        minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap, backgroundColor: Colors.red, foregroundColor: Colors.white,
+                                      ),
+                                      child: const Text('취소', style: TextStyle(fontSize: 10)),
+                                    ),
+                                  ],
+                                );
                               } else if (returnStatus == 'return_confirmed' || returnStatus == 'return_preparing') {
                                 returnUi = Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -237,7 +305,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                     const Text(' [회수 예정]', style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold)),
                                     const SizedBox(width: 4),
                                     ElevatedButton(
-                                      onPressed: () => _orderService.updateItemReturnStatus(order.id, item['productId'], 'user_returned'),
+                                      onPressed: () => _orderService.updateItemReturnStatus(order.id, index, 'user_returned'),
                                       style: ElevatedButton.styleFrom(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                                         minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap, backgroundColor: Colors.purple, foregroundColor: Colors.white,
@@ -255,7 +323,28 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                     const Text(' [수령 확인됨]', style: TextStyle(color: Colors.teal, fontSize: 12, fontWeight: FontWeight.bold)),
                                     const SizedBox(width: 4),
                                     ElevatedButton(
-                                      onPressed: () => _orderService.updateItemReturnStatus(order.id, item['productId'], 'returned'),
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text('최종 승인'),
+                                            content: const Text('정상적으로 수령 및 확인을 마쳤습니까?\n\n승인 시 대여 보증금이 즉시 포인트로 반환됩니다.'),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소', style: TextStyle(color: Colors.grey))),
+                                              TextButton(
+                                                onPressed: () async {
+                                                  Navigator.pop(context);
+                                                  final success = await _orderService.updateItemReturnStatus(order.id, index, 'returned');
+                                                  if (!success && context.mounted) {
+                                                    UiUtils.showPopup(context, '최종 승인 처리에 실패했습니다. 권한이 없거나 네트워크를 확인해주세요.');
+                                                  }
+                                                },
+                                                child: const Text('예, 승인합니다', style: TextStyle(color: Colors.green)),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
                                       style: ElevatedButton.styleFrom(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                                         minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap, backgroundColor: Colors.green, foregroundColor: Colors.white,
@@ -267,7 +356,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                               } else {
                                 returnUi = TextButton(
                                   onPressed: () {
-                                    _requestReturn(order.id, item);
+                                    _requestReturn(order.id, index, item);
                                   },
                                   style: TextButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
