@@ -54,8 +54,8 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
               ],
             ),
             Expanded(
-              child: FutureBuilder<QuerySnapshot>(
-                future: FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).get(),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).snapshots(),
                 builder: (context, userSnap) {
                   if (userSnap.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());

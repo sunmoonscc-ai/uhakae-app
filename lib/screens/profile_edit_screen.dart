@@ -93,6 +93,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!PreferencesService.isAdmin) {
+      if (_schoolController.text.trim().isEmpty) {
+        UiUtils.showPopup(context, '어학원을 선택해주세요.');
+        return;
+      }
+      if (_startDateController.text.trim().isEmpty) {
+        UiUtils.showPopup(context, '수업시작일을 입력해주세요.');
+        return;
+      }
+      if (_endDateController.text.trim().isEmpty) {
+        UiUtils.showPopup(context, '수업종료(예정)일을 입력해주세요.');
+        return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
     });
