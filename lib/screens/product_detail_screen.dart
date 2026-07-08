@@ -353,8 +353,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         final currentCartTotal = cart.totalPriceKrw;
                         final requiredPointsForThis = widget.product.isBankTransferOnly ? 0.0 : _totalPriceKrw;
                         
-                        final userQuery = await FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).get();
-                        final currentPoints = userQuery.docs.isNotEmpty ? ((userQuery.docs.first.data()['points'] as num?)?.toDouble() ?? 0.0) : 0.0;
+                        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+                        final currentPoints = userDoc.exists ? ((userDoc.data()?['points'] as num?)?.toDouble() ?? 0.0) : 0.0;
                         if (currentPoints < (currentCartTotal + requiredPointsForThis)) {
                           if (context.mounted) {
                             final currencyFormatter = NumberFormat('#,##0', 'en_US');

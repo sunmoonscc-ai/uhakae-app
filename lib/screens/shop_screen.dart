@@ -76,14 +76,14 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                   final String name = (user != null && user.displayName != null && user.displayName!.isNotEmpty) 
                       ? user.displayName! 
                       : (user != null ? '회원' : '게스트');
-                  return StreamBuilder<QuerySnapshot>(
-                    stream: user != null && user.email != null
-                        ? FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).snapshots()
+                  return StreamBuilder<DocumentSnapshot>(
+                    stream: user != null
+                        ? FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots()
                         : null,
                     builder: (context, userSnapshot) {
                       int points = 0;
-                      if (userSnapshot.hasData && userSnapshot.data!.docs.isNotEmpty) {
-                        final data = userSnapshot.data!.docs.first.data() as Map<String, dynamic>;
+                      if (userSnapshot.hasData && userSnapshot.data != null && userSnapshot.data!.exists) {
+                        final data = userSnapshot.data!.data() as Map<String, dynamic>;
                         points = (data['points'] as num?)?.toInt() ?? 0;
                       }
 

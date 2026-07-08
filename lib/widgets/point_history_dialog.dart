@@ -54,16 +54,20 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
               ],
             ),
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).snapshots(),
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
                 builder: (context, userSnap) {
                   if (userSnap.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (!userSnap.hasData || userSnap.data!.docs.isEmpty) {
+
+                  double currentPoints = 0.0;
+                  if (userSnap.hasData && userSnap.data != null && userSnap.data!.exists) {
+                    currentPoints = (userSnap.data!.data() as Map<String, dynamic>)['points']?.toDouble() ?? 0.0;
+                  } else {
                     return Center(child: Text('사용자 정보를 찾을 수 없습니다.', style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54)));
                   }
-                  final userDocId = userSnap.data!.docs.first.id;
+                  final userDocId = userSnap.data!.id;
 
                   return StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
@@ -93,9 +97,7 @@ class _PointHistoryDialogState extends State<PointHistoryDialog> {
                     };
                   }).toList();
 
-                  // 1. Calculate running balance
-                  double currentPoints = (userSnap.data!.docs.first.data() as Map<String, dynamic>)['points']?.toDouble() ?? 0.0;
-                  
+                  // 1. Calculate running balance (currentPoints is already calculated in the outer builder)
                   history.sort((a, b) {
                     final aTime = a['createdAt']?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
                     final bTime = b['createdAt']?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
