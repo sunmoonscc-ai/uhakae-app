@@ -349,9 +349,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           return;
                         }
 
+                        final cart = Provider.of<CartProvider>(context, listen: false);
+                        final currentCartTotal = cart.totalPriceKrw;
+                        final requiredPointsForThis = widget.product.isBankTransferOnly ? 0.0 : _totalPriceKrw;
+                        
                         final userQuery = await FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).get();
                         final currentPoints = userQuery.docs.isNotEmpty ? ((userQuery.docs.first.data()['points'] as num?)?.toDouble() ?? 0.0) : 0.0;
-                        if (currentPoints < _totalPriceKrw) {
+                        if (currentPoints < (currentCartTotal + requiredPointsForThis)) {
                           if (context.mounted) {
                             final currencyFormatter = NumberFormat('#,##0', 'en_US');
                             showDialog(
@@ -365,8 +369,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     children: [
                                       const Text('보유 포인트가 부족합니다.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                                       const SizedBox(height: 12),
-                                      Text('필요 포인트: ${currencyFormatter.format(_totalPriceKrw)}', style: const TextStyle(fontSize: 14)),
-                                      Text('보유 포인트: ${currencyFormatter.format(currentPoints)}', style: const TextStyle(fontSize: 14, color: Colors.redAccent)),
+                                      if (currentCartTotal > 0)
+                                        Text('장바구니 총액: ${currencyFormatter.format(currentCartTotal)}', style: const TextStyle(fontSize: 14)),
+                                      Text('현재 추가 품목: ${currencyFormatter.format(requiredPointsForThis)}', style: const TextStyle(fontSize: 14)),
+                                      const Divider(height: 16),
+                                      Text('총 필요 포인트: ${currencyFormatter.format(currentCartTotal + requiredPointsForThis)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                      Text('현재 보유 포인트: ${currencyFormatter.format(currentPoints)}', style: const TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.bold)),
                                       const SizedBox(height: 16),
                                       const Text('포인트를 충전하시겠습니까?', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.blue)),
                                     ],

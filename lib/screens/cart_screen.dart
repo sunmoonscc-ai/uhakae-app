@@ -145,12 +145,12 @@ class _CartScreenState extends State<CartScreen> {
                                 children: [
                                   IconButton(
                                     icon: const Icon(Icons.remove, size: 20),
-                                    onPressed: () => cart.updateQuantity(item.product.id, item.quantity - 1),
+                                    onPressed: () => cart.updateQuantityAt(index, item.quantity - 1),
                                   ),
                                   Text('${item.quantity}', style: const TextStyle(fontSize: 16)),
                                   IconButton(
                                     icon: const Icon(Icons.add, size: 20),
-                                    onPressed: () => cart.updateQuantity(item.product.id, item.quantity + 1),
+                                    onPressed: () => cart.updateQuantityAt(index, item.quantity + 1),
                                   ),
                                 ],
                               ),

@@ -52,4 +52,21 @@ class CartProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void removeItemAt(int index) {
+    if (index >= 0 && index < _items.length) {
+      _items.removeAt(index);
+      notifyListeners();
+    }
+  }
+
+  void updateQuantityAt(int index, int newQuantity) {
+    if (index < 0 || index >= _items.length) return;
+    if (newQuantity <= 0) {
+      removeItemAt(index);
+      return;
+    }
+    _items[index].quantity = newQuantity;
+    notifyListeners();
+  }
 }

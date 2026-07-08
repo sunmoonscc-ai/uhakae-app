@@ -945,7 +945,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
       }
 
       return FutureBuilder<QuerySnapshot>(
-        future: FirebaseFirestore.instance.collection('products').where(FieldPath.documentId, whereIn: productIds.isNotEmpty ? productIds : ['dummy']).get(),
+        future: FirebaseFirestore.instance.collection('shop_items').where(FieldPath.documentId, whereIn: productIds.isNotEmpty ? productIds : ['dummy']).get(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Padding(

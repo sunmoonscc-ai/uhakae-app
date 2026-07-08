@@ -26,69 +26,40 @@ class OrderService {
       orderData['status'] = 'pending';
       orderData['createdAt'] = FieldValue.serverTimestamp();
 
-      return await _firestore.runTransaction((transaction) async {
+      final result = await _firestore.runTransaction((transaction) async {
         double pointsToDeduct = 0;
-        double pointsToAdd = 0;
         final items = List<dynamic>.from(orderData['items'] ?? []);
         for (var item in items) {
           final itemPrice = (item['totalPriceKrw'] ?? 0).toDouble();
           if (item['isBankTransferOnly'] != true) {
             pointsToDeduct += itemPrice;
-          } else {
-            pointsToAdd += itemPrice;
           }
         }
 
-        if ((pointsToDeduct > 0 || pointsToAdd > 0) && userDocId != null) {
-          final userRef = _firestore.collection('users').doc(userDocId);
-          final userDoc = await transaction.get(userRef);
-          if (userDoc.exists) {
-            final currentPoints = (userDoc.data()?['points'] as num?)?.toDouble() ?? 0.0;
-            if (currentPoints < pointsToDeduct) {
-              throw Exception('Not enough points');
-            }
-            
-            final netPointChange = pointsToAdd - pointsToDeduct;
-            transaction.update(userRef, {
-              'points': FieldValue.increment(netPointChange),
-            });
-            
-            if (pointsToDeduct > 0) {
-              final historyRef = _firestore.collection('point_history').doc();
-              transaction.set(historyRef, {
-                'userId': userDocId,
-                'amount': -pointsToDeduct,
-                'type': 'order_payment',
-                'description': '물품 구매',
-                'orderId': 'pending_order',
-                'createdAt': FieldValue.serverTimestamp(),
-              });
-            }
-            
-            if (pointsToAdd > 0) {
-              final historyRef2 = _firestore.collection('point_history').doc();
-              transaction.set(historyRef2, {
-                'userId': userDocId,
-                'amount': pointsToAdd,
-                'type': 'point_charge',
-                'description': '포인트 충전 (계좌이체 물품 구입)',
-                'orderId': 'pending_order',
-                'createdAt': FieldValue.serverTimestamp(),
-              });
-            }
-          }
+        // --- READ PHASE ---
+        DocumentSnapshot<Map<String, dynamic>>? userDoc;
+        final userRef = userDocId != null ? _firestore.collection('users').doc(userDocId) : null;
+        if (userRef != null) {
+          userDoc = await transaction.get(userRef);
         }
 
-        // Deduct Inventory
         final productDocs = <String, DocumentSnapshot>{};
         for (var item in items) {
           final productId = item['productId'];
           if (productId != null && !productDocs.containsKey(productId)) {
-            final productRef = _firestore.collection('products').doc(productId);
+            final productRef = _firestore.collection('shop_items').doc(productId);
             final productSnap = await transaction.get(productRef);
             if (productSnap.exists) {
               productDocs[productId] = productSnap;
             }
+          }
+        }
+
+        // --- VALIDATION PHASE ---
+        if (userDoc != null && userDoc.exists) {
+          final currentPoints = (userDoc.data()?['points'] as num?)?.toDouble() ?? 0.0;
+          if (currentPoints < pointsToDeduct) {
+            return 'NOT_ENOUGH_POINTS';
           }
         }
 
@@ -98,11 +69,37 @@ class OrderService {
           if (productId != null && productDocs.containsKey(productId)) {
             final productSnap = productDocs[productId]!;
             final currentQty = (productSnap.data() as Map<String, dynamic>)['totalQuantity'] ?? 999;
+            if (currentQty != 999 && currentQty < qty) {
+              return 'NOT_ENOUGH_STOCK:${item['name']}';
+            }
+          }
+        }
+
+        // --- WRITE PHASE ---
+        if (userDoc != null && userDoc.exists && pointsToDeduct > 0) {
+          transaction.update(userRef!, {
+            'points': FieldValue.increment(-pointsToDeduct),
+          });
+          
+          final historyRef = _firestore.collection('point_history').doc();
+          transaction.set(historyRef, {
+            'userId': userDocId,
+            'amount': -pointsToDeduct,
+            'type': 'order_payment',
+            'description': '물품 구매/대여',
+            'orderId': 'pending_order',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+
+        for (var item in items) {
+          final productId = item['productId'];
+          final qty = item['quantity'] ?? 1;
+          if (productId != null && productDocs.containsKey(productId)) {
+            final productSnap = productDocs[productId]!;
+            final currentQty = (productSnap.data() as Map<String, dynamic>)['totalQuantity'] ?? 999;
             if (currentQty != 999) {
-              if (currentQty < qty) {
-                throw Exception('Not enough stock for ${item['name']}');
-              }
-              final productRef = _firestore.collection('products').doc(productId);
+              final productRef = _firestore.collection('shop_items').doc(productId);
               transaction.update(productRef, {
                 'totalQuantity': FieldValue.increment(-qty),
               });
@@ -112,17 +109,21 @@ class OrderService {
 
         final newOrderRef = _firestore.collection('orders').doc();
         transaction.set(newOrderRef, orderData);
+        
+        return null; // null means success
       });
-      return null; // null means success
+
+      if (result == 'NOT_ENOUGH_POINTS') {
+        return '보유하신 포인트가 부족합니다.';
+      } else if (result != null && result is String && result.startsWith('NOT_ENOUGH_STOCK:')) {
+        final productName = result.split(':')[1];
+        return '[$productName] 상품의 재고가 부족합니다.';
+      }
+      
+      return null;
     } catch (e) {
       print('Error submitting order: $e');
-      if (e.toString().contains('Not enough points')) {
-        return '보유하신 포인트가 부족합니다.';
-      }
-      if (e.toString().contains('Not enough stock')) {
-        return '일부 상품의 재고가 부족합니다.';
-      }
-      return '주문 전송에 실패했습니다. 다시 시도해주세요.';
+      return '주문 전송에 실패했습니다. 에러: $e';
     }
   }
 
@@ -168,7 +169,7 @@ class OrderService {
             final productId = item['productId'];
             final qty = item['quantity'] ?? 1;
             if (productId != null) {
-              final productRef = _firestore.collection('products').doc(productId);
+              final productRef = _firestore.collection('shop_items').doc(productId);
               final productSnap = await transaction.get(productRef);
               if (productSnap.exists) {
                 final currentQty = (productSnap.data() as Map<String, dynamic>)['totalQuantity'] ?? 999;
@@ -276,7 +277,7 @@ class OrderService {
             final productId = item['productId'];
             final qty = item['quantity'] ?? 1;
             if (productId != null) {
-              final productRef = _firestore.collection('products').doc(productId);
+              final productRef = _firestore.collection('shop_items').doc(productId);
               final productSnap = await transaction.get(productRef);
               if (productSnap.exists) {
                 final currentQty = (productSnap.data() as Map<String, dynamic>)['totalQuantity'] ?? 999;
@@ -454,7 +455,8 @@ class OrderService {
           final item = Map<String, dynamic>.from(items[i]);
           if (item['status'] == null || item['status'] == 'approved' || item['status'] == 'pending') {
              item['status'] = 'completed';
-             if (item['isBankTransferOnly'] == true) {
+             final isPointCard = item['name'].toString().contains('포인트카드') || item['name'].toString().contains('포인트 충전');
+             if (item['isBankTransferOnly'] == true || isPointCard) {
                pointsToAdd += (item['totalPriceKrw'] ?? 0).toDouble();
              }
              items[i] = item;
