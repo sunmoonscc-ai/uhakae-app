@@ -208,6 +208,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           onTap: (isDate && enabled) ? () => _selectDate(context, controller) : null,
           decoration: InputDecoration(
             hintText: hint,
+            hintStyle: const TextStyle(color: Colors.grey),
             filled: true,
             fillColor: enabled ? (isDarkMode ? Colors.grey[900] : Colors.white) : (isDarkMode ? Colors.grey[800] : Colors.grey[200]),
             border: OutlineInputBorder(
@@ -232,7 +233,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             color: enabled ? (isDarkMode ? Colors.white : Colors.black) : (isDarkMode ? Colors.white54 : Colors.black54),
           ),
           validator: enabled ? (value) {
-            if (label == '휴대전화 (필리핀)') return null; // 필리핀 번호는 선택사항
+            if (label == '휴대전화 (필리핀)' || label == '휴대전화 (필리핀) (옵션)') return null; // 필리핀 번호는 선택사항
             if (value == null || value.isEmpty) {
               return '$label을(를) 입력해주세요.';
             }
@@ -385,9 +386,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    _buildTextField('이름', _nameController, isDarkMode, hint: '이름을 입력하세요'),
+                    _buildTextField('이름 (실제이름으로 변경바랍니다)', _nameController, isDarkMode, hint: '이름을 입력하세요'),
                     _buildTextField('휴대전화 (한국)', _phoneKrController, isDarkMode, hint: '예: 010-1234-5678', keyboardType: TextInputType.phone),
-                    _buildTextField('휴대전화 (필리핀)', _phonePhController, isDarkMode, hint: '예: 0917-123-4567', keyboardType: TextInputType.phone),
+                    _buildTextField('휴대전화 (필리핀) (옵션)', _phonePhController, isDarkMode, hint: '예: 0917-123-4567', keyboardType: TextInputType.phone),
                     _buildSchoolDropdown(isDarkMode),
                     Row(
                       children: [
