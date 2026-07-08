@@ -862,7 +862,7 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
                                 padding: const EdgeInsets.only(left: 8.0),
                                 child: Row(
                                   children: [
-                                    const Text('보유 포인트: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                                    const Text('현재 실시간 보유 포인트: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                                     const Icon(Icons.savings_outlined, color: Colors.blue, size: 16),
                                     const SizedBox(width: 2),
                                     Text(NumberFormat('#,###').format(userPoints), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
@@ -964,8 +964,9 @@ class _AdminShopManagementTabState extends State<AdminShopManagementTab> {
             }
           }
 
-          final bool canPayWithPoints = userPoints >= group.totalKrw;
-          final bool isPointPaymentAllowed = !hasBankTransferOnly && canPayWithPoints && userDocId != null;
+          // 이미 사용자가 장바구니에서 결제(주문)를 생성할 때 포인트가 차감되었으므로
+          // 현재 보유 포인트(userPoints)가 결제 금액(totalKrw)보다 클 필요는 없습니다.
+          final bool isPointPaymentAllowed = !hasBankTransferOnly && userDocId != null;
           
           return Row(
             children: [

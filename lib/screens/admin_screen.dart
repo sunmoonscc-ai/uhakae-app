@@ -1517,6 +1517,55 @@ class _AdminScreenState extends State<AdminScreen> {
     return Center(child: Text('$_selectedTab 기능은 준비 중입니다.'));
   }
 
+  void _showAutoConfirmDialog({
+    required String title,
+    required String content,
+    required Future<void> Function() onConfirm,
+  }) {
+    bool isCancelled = false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        Future.delayed(const Duration(seconds: 3), () async {
+          if (!isCancelled) {
+            if (Navigator.of(dialogContext).canPop()) {
+              Navigator.of(dialogContext).pop();
+            }
+            await onConfirm();
+            if (mounted) {
+              UiUtils.showPopup(context, '처리되었습니다.');
+            }
+          }
+        });
+        return AlertDialog(
+          title: Text(title),
+          content: Text(content),
+          actions: [
+            TextButton(
+              onPressed: () {
+                isCancelled = true;
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('취소', style: TextStyle(color: Colors.red)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                isCancelled = true;
+                Navigator.of(dialogContext).pop();
+                await onConfirm();
+                if (mounted) {
+                  UiUtils.showPopup(context, '처리되었습니다.');
+                }
+              },
+              child: const Text('즉시 승인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildRentalReturnManagement(bool isDarkMode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1536,7 +1585,8 @@ class _AdminScreenState extends State<AdminScreen> {
                 final orderData = doc.data() as Map<String, dynamic>;
                 final items = List<dynamic>.from(orderData['items'] ?? []);
                 for (var item in items) {
-                  if (item['type'] == 'rent' && (item['returnStatus'] == 'return_requested' || item['returnStatus'] == 'return_preparing')) {
+                  final status = item['returnStatus'];
+                  if (item['type'] == 'rent' && status != null) {
                     returnRequestedItems.add({
                       'orderId': doc.id,
                       'userName': orderData['userName'] ?? '알 수 없음',
@@ -1549,7 +1599,7 @@ class _AdminScreenState extends State<AdminScreen> {
               }
 
               if (returnRequestedItems.isEmpty) {
-                return const Center(child: Text('반납 요청이 없습니다.'));
+                return const Center(child: Text('진행 중인 반납 요청이 없습니다.'));
               }
 
               return ListView.builder(
@@ -1559,8 +1609,15 @@ class _AdminScreenState extends State<AdminScreen> {
                   final item = data['item'];
                   final returnStatus = item['returnStatus'];
                   
-                  String statusText = returnStatus == 'return_requested' ? '반납 요청됨' : '회수 준비중';
-                  Color statusColor = returnStatus == 'return_requested' ? Colors.orange : Colors.blue;
+                  String statusText = '';
+                  Color statusColor = Colors.black;
+                  
+                  if (returnStatus == 'return_requested') { statusText = '반납 요청됨'; statusColor = Colors.orange; }
+                  else if (returnStatus == 'return_confirmed' || returnStatus == 'return_preparing') { statusText = '회수 예정'; statusColor = Colors.blue; }
+                  else if (returnStatus == 'user_returned') { statusText = '사용자 반납 완료 (회수중)'; statusColor = Colors.purple; }
+                  else if (returnStatus == 'admin_received') { statusText = '수령 확인됨 (최종 승인 대기)'; statusColor = Colors.teal; }
+                  else if (returnStatus == 'returned') { statusText = '반납 완료'; statusColor = Colors.grey; }
+                  else if (returnStatus == 'returned_damaged') { statusText = '파손 반납 완료'; statusColor = Colors.red; }
 
                   return Card(
                     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1573,18 +1630,49 @@ class _AdminScreenState extends State<AdminScreen> {
                           if (returnStatus == 'return_requested')
                             ElevatedButton(
                               onPressed: () async {
-                                await OrderService().updateItemReturnStatusByAdmin(data['orderId'], item['productId'], 'return_preparing');
+                                await OrderService().updateItemReturnStatus(data['orderId'], item['productId'], 'return_confirmed');
                               },
                               child: const Text('접수'),
                             ),
-                          if (returnStatus == 'return_preparing')
+                          if (returnStatus == 'return_confirmed' || returnStatus == 'return_preparing')
                             ElevatedButton(
                               onPressed: () async {
-                                await OrderService().updateItemReturnStatusByAdmin(data['orderId'], item['productId'], 'returned');
+                                await OrderService().updateItemReturnStatus(data['orderId'], item['productId'], 'admin_received');
+                              },
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                              child: const Text('관리자 회수'),
+                            ),
+                          if (returnStatus == 'user_returned') ...[
+                            ElevatedButton(
+                              onPressed: () {
+                                final deposit = item['depositKrw'] ?? 0;
+                                _showAutoConfirmDialog(
+                                  title: '정상 수령 확인',
+                                  content: '재고현황에 반영하고 보증금(${deposit}원)을 반납하겠습니다.',
+                                  onConfirm: () async {
+                                    await OrderService().updateItemReturnStatus(data['orderId'], item['productId'], 'returned');
+                                  },
+                                );
                               },
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                              child: const Text('회수완료'),
+                              child: const Text('정상 수령'),
                             ),
+                            const SizedBox(width: 4),
+                            ElevatedButton(
+                              onPressed: () {
+                                final deposit = item['depositKrw'] ?? 0;
+                                _showAutoConfirmDialog(
+                                  title: '파손 처리 확인',
+                                  content: '재고현황에 반영하고 보증금(${deposit}원)은 미반납입니다.',
+                                  onConfirm: () async {
+                                    await OrderService().updateItemReturnStatus(data['orderId'], item['productId'], 'returned_damaged');
+                                  },
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                              child: const Text('파손 처리'),
+                            ),
+                          ],
                         ],
                       ),
                     ),

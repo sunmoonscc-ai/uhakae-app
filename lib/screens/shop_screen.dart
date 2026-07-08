@@ -82,10 +82,14 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                         : null,
                     builder: (context, userSnapshot) {
                       int points = 0;
+                      int lockedPoints = 0;
                       if (userSnapshot.hasData && userSnapshot.data != null && userSnapshot.data!.exists) {
                         final data = userSnapshot.data!.data() as Map<String, dynamic>;
                         points = (data['points'] as num?)?.toInt() ?? 0;
+                        lockedPoints = (data['lockedPoints'] as num?)?.toInt() ?? 0;
                       }
+
+                      int displayPoints = points - lockedPoints;
 
                       return StreamBuilder<QuerySnapshot>(
                         stream: user != null
@@ -97,14 +101,12 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                                 .snapshots()
                             : null,
                         builder: (context, pendingSnapshot) {
-                          bool hasPending = pendingSnapshot.hasData && pendingSnapshot.data!.docs.isNotEmpty;
-
                           Color pointColor = Colors.amber;
-                          if (hasPending) {
+                          if (lockedPoints > 0) {
                             pointColor = Colors.green;
-                          } else if (points <= 0) {
+                          } else if (displayPoints <= 0) {
                             pointColor = Colors.red;
-                          } else if (points <= 10000) {
+                          } else if (displayPoints <= 10000) {
                             pointColor = Colors.orange;
                           }
 
@@ -122,7 +124,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                                   Icon(Icons.savings_outlined, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, size: 20),
                                   const SizedBox(width: 2),
                                   Text(
-                                    NumberFormat('#,###').format(points),
+                                    NumberFormat('#,###').format(displayPoints),
                                     style: TextStyle(
                                       color: pointColor,
                                       fontWeight: FontWeight.bold,

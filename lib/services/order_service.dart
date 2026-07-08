@@ -57,8 +57,12 @@ class OrderService {
 
         // --- VALIDATION PHASE ---
         if (userDoc != null && userDoc.exists) {
-          final currentPoints = (userDoc.data()?['points'] as num?)?.toDouble() ?? 0.0;
-          if (currentPoints < pointsToDeduct) {
+          final userData = userDoc.data() ?? {};
+          final currentPoints = (userData['points'] as num?)?.toDouble() ?? 0.0;
+          final lockedPoints = (userData['lockedPoints'] as num?)?.toDouble() ?? 0.0;
+          final availablePoints = currentPoints - lockedPoints;
+          
+          if (availablePoints < pointsToDeduct) {
             return 'NOT_ENOUGH_POINTS';
           }
         }
@@ -77,18 +81,10 @@ class OrderService {
 
         // --- WRITE PHASE ---
         if (userDoc != null && userDoc.exists && pointsToDeduct > 0) {
+          // 실제 포인트(points)는 주문이 확정(preparing/approved)될 때 차감합니다.
+          // 대기 중인 동안에는 lockedPoints만 증가시켜 중복 사용을 방지합니다.
           transaction.update(userRef!, {
-            'points': FieldValue.increment(-pointsToDeduct),
-          });
-          
-          final historyRef = _firestore.collection('point_history').doc();
-          transaction.set(historyRef, {
-            'userId': userDocId,
-            'amount': -pointsToDeduct,
-            'type': 'order_payment',
-            'description': '물품 구매/대여',
-            'orderId': 'pending_order',
-            'createdAt': FieldValue.serverTimestamp(),
+            'lockedPoints': FieldValue.increment(pointsToDeduct),
           });
         }
 
@@ -183,25 +179,33 @@ class OrderService {
           }
           
           final userEmail = orderData['userEmail'];
+          final isPointDeducted = orderData['isPointDeducted'] == true;
+
           if (refundKrw > 0 && userEmail != null) {
             final userSnap = await _firestore.collection('users').where('email', isEqualTo: userEmail).limit(1).get();
             if (userSnap.docs.isNotEmpty) {
               final userDocId = userSnap.docs.first.id;
               final userRef = _firestore.collection('users').doc(userDocId);
               
-              transaction.update(userRef, {
-                'points': FieldValue.increment(refundKrw),
-              });
-              
-              final historyRef = _firestore.collection('point_history').doc();
-              transaction.set(historyRef, {
-                'userId': userDocId,
-                'amount': refundKrw,
-                'type': 'order_cancel_refund',
-                'description': '주문 취소 포인트 환불',
-                'orderId': orderId,
-                'createdAt': FieldValue.serverTimestamp(),
-              });
+              if (isPointDeducted) {
+                transaction.update(userRef, {
+                  'points': FieldValue.increment(refundKrw),
+                });
+                
+                final historyRef = _firestore.collection('point_history').doc();
+                transaction.set(historyRef, {
+                  'userId': userDocId,
+                  'amount': refundKrw,
+                  'type': 'order_cancel_refund',
+                  'description': '주문 취소 포인트 환불',
+                  'orderId': orderId,
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+              } else {
+                transaction.update(userRef, {
+                  'lockedPoints': FieldValue.increment(-refundKrw),
+                });
+              }
             }
           }
           return true;
@@ -239,6 +243,8 @@ class OrderService {
         final orderData = freshSnap.data() as Map<String, dynamic>;
         final currentStatus = orderData['status'];
         
+        final isPointDeducted = orderData['isPointDeducted'] == true;
+
         // Prevent double processing
         if (currentStatus == newStatus) return true;
 
@@ -262,6 +268,39 @@ class OrderService {
         }
         if (itemsChanged) {
           updates['items'] = items;
+        }
+
+        if (['delivered', 'receipt_confirmed', 'completed', 'not_received'].contains(newStatus) && !isPointDeducted) {
+           double paymentKrw = 0;
+           for (var item in items) {
+             if (item['isBankTransferOnly'] != true) {
+               paymentKrw += (item['totalPriceKrw'] ?? 0).toDouble();
+             }
+           }
+           if (paymentKrw > 0) {
+             final userEmail = orderData['userEmail'];
+             if (userEmail != null) {
+               final userSnap = await _firestore.collection('users').where('email', isEqualTo: userEmail).limit(1).get();
+               if (userSnap.docs.isNotEmpty) {
+                 final userDocId = userSnap.docs.first.id;
+                 final userRef = _firestore.collection('users').doc(userDocId);
+                 transaction.update(userRef, {
+                   'points': FieldValue.increment(-paymentKrw),
+                   'lockedPoints': FieldValue.increment(-paymentKrw),
+                 });
+                 final historyRef = _firestore.collection('point_history').doc();
+                 transaction.set(historyRef, {
+                   'userId': userDocId,
+                   'amount': -paymentKrw,
+                   'type': 'order_payment',
+                   'description': '물품 구매/대여 결제 완료',
+                   'orderId': orderId,
+                   'createdAt': FieldValue.serverTimestamp(),
+                 });
+                 updates['isPointDeducted'] = true;
+               }
+             }
+           }
         }
 
         transaction.update(orderRef, updates);
@@ -298,19 +337,25 @@ class OrderService {
               final userDocId = userSnap.docs.first.id;
               final userRef = _firestore.collection('users').doc(userDocId);
               
-              transaction.update(userRef, {
-                'points': FieldValue.increment(refundKrw),
-              });
-              
-              final historyRef = _firestore.collection('point_history').doc();
-              transaction.set(historyRef, {
-                'userId': userDocId,
-                'amount': refundKrw,
-                'type': 'order_refund',
-                'description': '전체 거절로 인한 포인트 환불',
-                'orderId': orderId,
-                'createdAt': FieldValue.serverTimestamp(),
-              });
+              if (isPointDeducted) {
+                transaction.update(userRef, {
+                  'points': FieldValue.increment(refundKrw),
+                });
+                
+                final historyRef = _firestore.collection('point_history').doc();
+                transaction.set(historyRef, {
+                  'userId': userDocId,
+                  'amount': refundKrw,
+                  'type': 'order_refund',
+                  'description': '전체 거절로 인한 포인트 환불',
+                  'orderId': orderId,
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+              } else {
+                transaction.update(userRef, {
+                  'lockedPoints': FieldValue.increment(-refundKrw),
+                });
+              }
             }
           }
         }
@@ -386,25 +431,34 @@ class OrderService {
 
         double newTotalKrw = (orderData['totalKrw'] ?? 0).toDouble();
 
+        final isPointDeducted = orderData['isPointDeducted'] == true;
+
         if (newStatus == 'rejected') {
           final priceKrw = (item['totalPriceKrw'] ?? 0).toDouble();
           newTotalKrw -= priceKrw;
 
           if (item['isBankTransferOnly'] != true && priceKrw > 0 && userDocId != null) {
             final userRef = _firestore.collection('users').doc(userDocId);
-            transaction.update(userRef, {
-              'points': FieldValue.increment(priceKrw),
-            });
             
-            final historyRef = _firestore.collection('point_history').doc();
-            transaction.set(historyRef, {
-              'userId': userDocId,
-              'amount': priceKrw,
-              'type': 'order_refund',
-              'description': '부분 거절로 인한 포인트 환불',
-              'orderId': orderId,
-              'createdAt': FieldValue.serverTimestamp(),
-            });
+            if (isPointDeducted) {
+              transaction.update(userRef, {
+                'points': FieldValue.increment(priceKrw),
+              });
+              
+              final historyRef = _firestore.collection('point_history').doc();
+              transaction.set(historyRef, {
+                'userId': userDocId,
+                'amount': priceKrw,
+                'type': 'order_refund',
+                'description': '부분 거절로 인한 포인트 환불',
+                'orderId': orderId,
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+            } else {
+              transaction.update(userRef, {
+                'lockedPoints': FieldValue.increment(-priceKrw),
+              });
+            }
           }
         }
 
@@ -591,8 +645,8 @@ class OrderService {
     }
   }
 
-  // 7. Admin updates return status for a rental item
-  Future<bool> updateItemReturnStatusByAdmin(String orderId, String productId, String newReturnStatus) async {
+  // 7. Update return status for a rental item (User & Admin)
+  Future<bool> updateItemReturnStatus(String orderId, String productId, String newReturnStatus) async {
     try {
       return await _firestore.runTransaction((transaction) async {
         final orderRef = _firestore.collection('orders').doc(orderId);
@@ -603,6 +657,7 @@ class OrderService {
         final items = List<dynamic>.from(orderData['items'] ?? []);
         bool updated = false;
         int qtyToRestore = 0;
+        double depositRefund = 0;
         
         for (int i = 0; i < items.length; i++) {
           final item = Map<String, dynamic>.from(items[i]);
@@ -610,8 +665,12 @@ class OrderService {
             item['returnStatus'] = newReturnStatus;
             items[i] = item;
             updated = true;
-            if (newReturnStatus == 'returned') {
+            if (newReturnStatus == 'returned' || newReturnStatus == 'returned_damaged') {
               qtyToRestore = item['quantity'] ?? 1;
+              if (newReturnStatus == 'returned') {
+                final deposit = (item['depositKrw'] ?? 0).toDouble();
+                depositRefund += deposit * qtyToRestore;
+              }
             }
           }
         }
@@ -619,7 +678,7 @@ class OrderService {
         if (updated) {
           transaction.update(orderRef, {'items': items});
           
-          if (newReturnStatus == 'returned' && qtyToRestore > 0) {
+          if ((newReturnStatus == 'returned' || newReturnStatus == 'returned_damaged') && qtyToRestore > 0) {
             final productRef = _firestore.collection('products').doc(productId);
             final productSnap = await transaction.get(productRef);
             if (productSnap.exists) {
@@ -628,6 +687,31 @@ class OrderService {
                 transaction.update(productRef, {
                   'totalQuantity': FieldValue.increment(qtyToRestore),
                 });
+              }
+            }
+            
+            if (depositRefund > 0) {
+              final userEmail = orderData['userEmail'];
+              if (userEmail != null) {
+                final userQuery = await _firestore.collection('users').where('email', isEqualTo: userEmail).limit(1).get();
+                if (userQuery.docs.isNotEmpty) {
+                  final userDocId = userQuery.docs.first.id;
+                  final userRef = _firestore.collection('users').doc(userDocId);
+                  
+                  transaction.update(userRef, {
+                    'points': FieldValue.increment(depositRefund),
+                  });
+
+                  final historyRef = _firestore.collection('point_history').doc();
+                  transaction.set(historyRef, {
+                    'userId': userDocId,
+                    'amount': depositRefund,
+                    'type': 'deposit_refund',
+                    'description': '물품 정상 반납 보증금 환불',
+                    'orderId': orderId,
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+                }
               }
             }
           }

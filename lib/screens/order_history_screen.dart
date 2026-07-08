@@ -16,20 +16,44 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   final OrderService _orderService = OrderService();
 
   Future<void> _requestReturn(String orderId, Map<String, dynamic> item) async {
-    final bool success = await _orderService.requestReturnForItem(orderId, item['productId']);
-    if (success) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('반납 요청이 접수되었습니다.')),
-        );
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('반납 요청 처리에 실패했습니다.')),
-        );
-      }
-    }
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('반납 요청'),
+        content: Text('${item['name']} 물품의 반납을 요청하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('취소', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final bool success = await _orderService.requestReturnForItem(orderId, item['productId']);
+              if (mounted) {
+                if (success) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('요청 접수 완료'),
+                      content: const Text('반납 요청이 정상적으로 접수되었습니다.\n관리자 확인 후 회수가 진행됩니다.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('확인')),
+                      ],
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('반납 요청 처리에 실패했습니다.')),
+                  );
+                }
+              }
+            },
+            child: const Text('반납 요청', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   String _getStatusText(String status) {
@@ -113,7 +137,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             }
 
             final inProgressOrders = orders.where((o) => !['completed', 'rejected', 'canceled'].contains(o.status)).toList();
-            final rentingOrders = orders.where((o) => o.status == 'completed' && o.items.any((item) => item['type'] == 'rent' && item['returnStatus'] != 'returned')).toList();
+            final rentingOrders = orders.where((o) => o.status == 'completed' && o.items.any((item) => item['type'] == 'rent' && item['returnStatus'] != 'returned' && item['returnStatus'] != 'returned_damaged')).toList();
             final completedOrders = orders.where((o) => ['completed', 'rejected', 'canceled'].contains(o.status) && !rentingOrders.contains(o)).toList();
 
             return TabBarView(
@@ -203,11 +227,43 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                             final returnStatus = item['returnStatus'];
                             
                             Widget returnUi = const SizedBox.shrink();
-                            if (isRentingTab && item['type'] == 'rent' && returnStatus != 'returned') {
+                            if (isRentingTab && item['type'] == 'rent' && returnStatus != 'returned' && returnStatus != 'returned_damaged') {
                               if (returnStatus == 'return_requested') {
                                 returnUi = const Text(' [반납요청됨]', style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold));
-                              } else if (returnStatus == 'return_preparing') {
-                                returnUi = const Text(' [회수준비중]', style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold));
+                              } else if (returnStatus == 'return_confirmed' || returnStatus == 'return_preparing') {
+                                returnUi = Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(' [회수 예정]', style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 4),
+                                    ElevatedButton(
+                                      onPressed: () => _orderService.updateItemReturnStatus(order.id, item['productId'], 'user_returned'),
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                        minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap, backgroundColor: Colors.purple, foregroundColor: Colors.white,
+                                      ),
+                                      child: const Text('전달 완료', style: TextStyle(fontSize: 10)),
+                                    ),
+                                  ],
+                                );
+                              } else if (returnStatus == 'user_returned') {
+                                returnUi = const Text(' [회수 중]', style: TextStyle(color: Colors.purple, fontSize: 12, fontWeight: FontWeight.bold));
+                              } else if (returnStatus == 'admin_received') {
+                                returnUi = Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(' [수령 확인됨]', style: TextStyle(color: Colors.teal, fontSize: 12, fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 4),
+                                    ElevatedButton(
+                                      onPressed: () => _orderService.updateItemReturnStatus(order.id, item['productId'], 'returned'),
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                        minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap, backgroundColor: Colors.green, foregroundColor: Colors.white,
+                                      ),
+                                      child: const Text('최종 승인', style: TextStyle(fontSize: 10)),
+                                    ),
+                                  ],
+                                );
                               } else {
                                 returnUi = TextButton(
                                   onPressed: () {
@@ -221,6 +277,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                   child: const Text('반납요청', style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold)),
                                 );
                               }
+                            } else if (isRentingTab && item['type'] == 'rent' && returnStatus == 'returned_damaged') {
+                               returnUi = const Text(' [파손 반납됨]', style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold));
                             }
 
                             return Padding(

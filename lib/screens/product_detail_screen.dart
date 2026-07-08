@@ -355,7 +355,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         
                         final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
                         final currentPoints = userDoc.exists ? ((userDoc.data()?['points'] as num?)?.toDouble() ?? 0.0) : 0.0;
-                        if (currentPoints < (currentCartTotal + requiredPointsForThis)) {
+                        final lockedPoints = userDoc.exists ? ((userDoc.data()?['lockedPoints'] as num?)?.toDouble() ?? 0.0) : 0.0;
+                        final availablePoints = currentPoints - lockedPoints;
+                        
+                        if (availablePoints < (currentCartTotal + requiredPointsForThis)) {
                           if (context.mounted) {
                             final currencyFormatter = NumberFormat('#,##0', 'en_US');
                             showDialog(
@@ -374,7 +377,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       Text('현재 추가 품목: ${currencyFormatter.format(requiredPointsForThis)}', style: const TextStyle(fontSize: 14)),
                                       const Divider(height: 16),
                                       Text('총 필요 포인트: ${currencyFormatter.format(currentCartTotal + requiredPointsForThis)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                                      Text('현재 보유 포인트: ${currencyFormatter.format(currentPoints)}', style: const TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                                      Text('현재 보유 포인트: ${currencyFormatter.format(availablePoints)}', style: const TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.bold)),
                                       const SizedBox(height: 16),
                                       const Text('포인트를 충전하시겠습니까?', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.blue)),
                                     ],

@@ -35,6 +35,7 @@ class _CartScreenState extends State<CartScreen> {
         'endDate': item.endDate?.toIso8601String(),
         'rentalDays': item.rentalDays,
         'totalPriceKrw': item.totalPriceKrw,
+        'depositKrw': item.product.depositKrw,
         'isBankTransferOnly': item.product.isBankTransferOnly,
       }).toList(),
     };
