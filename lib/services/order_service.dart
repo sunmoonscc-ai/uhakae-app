@@ -7,23 +7,20 @@ class OrderService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // 1. Submit a new order
-  Future<bool> submitOrder(Map<String, dynamic> orderData) async {
+  Future<String?> submitOrder(Map<String, dynamic> orderData) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) return false;
+      if (user == null) return '로그인이 필요합니다.';
 
       orderData['userId'] = user.uid;
       
-      String? userDocId;
-      if (user.email != null) {
-        final userSnap = await _firestore.collection('users').where('email', isEqualTo: user.email).limit(1).get();
-        if (userSnap.docs.isNotEmpty) {
-          userDocId = userSnap.docs.first.id;
-          final userData = userSnap.docs.first.data();
-          orderData['userName'] = userData['name'];
-          orderData['userSchool'] = userData['school'];
-          orderData['userEmail'] = userData['email'];
-        }
+      String? userDocId = user.uid;
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        orderData['userName'] = userData['name'];
+        orderData['userSchool'] = userData['school'];
+        orderData['userEmail'] = userData['email'];
       }
 
       orderData['status'] = 'pending';
@@ -31,14 +28,18 @@ class OrderService {
 
       return await _firestore.runTransaction((transaction) async {
         double pointsToDeduct = 0;
+        double pointsToAdd = 0;
         final items = List<dynamic>.from(orderData['items'] ?? []);
         for (var item in items) {
+          final itemPrice = (item['totalPriceKrw'] ?? 0).toDouble();
           if (item['isBankTransferOnly'] != true) {
-            pointsToDeduct += (item['totalPriceKrw'] ?? 0).toDouble();
+            pointsToDeduct += itemPrice;
+          } else {
+            pointsToAdd += itemPrice;
           }
         }
 
-        if (pointsToDeduct > 0 && userDocId != null) {
+        if ((pointsToDeduct > 0 || pointsToAdd > 0) && userDocId != null) {
           final userRef = _firestore.collection('users').doc(userDocId);
           final userDoc = await transaction.get(userRef);
           if (userDoc.exists) {
@@ -46,30 +47,82 @@ class OrderService {
             if (currentPoints < pointsToDeduct) {
               throw Exception('Not enough points');
             }
+            
+            final netPointChange = pointsToAdd - pointsToDeduct;
             transaction.update(userRef, {
-              'points': FieldValue.increment(-pointsToDeduct),
+              'points': FieldValue.increment(netPointChange),
             });
             
-            final historyRef = _firestore.collection('point_history').doc();
-            transaction.set(historyRef, {
-              'userId': userDocId,
-              'amount': -pointsToDeduct,
-              'type': 'order_payment',
-              'description': '물품 구매',
-              'orderId': 'pending_order', // Will be updated later if needed, or we just don't have orderId yet
-              'createdAt': FieldValue.serverTimestamp(),
-            });
+            if (pointsToDeduct > 0) {
+              final historyRef = _firestore.collection('point_history').doc();
+              transaction.set(historyRef, {
+                'userId': userDocId,
+                'amount': -pointsToDeduct,
+                'type': 'order_payment',
+                'description': '물품 구매',
+                'orderId': 'pending_order',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+            }
+            
+            if (pointsToAdd > 0) {
+              final historyRef2 = _firestore.collection('point_history').doc();
+              transaction.set(historyRef2, {
+                'userId': userDocId,
+                'amount': pointsToAdd,
+                'type': 'point_charge',
+                'description': '포인트 충전 (계좌이체 물품 구입)',
+                'orderId': 'pending_order',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+            }
+          }
+        }
+
+        // Deduct Inventory
+        final productDocs = <String, DocumentSnapshot>{};
+        for (var item in items) {
+          final productId = item['productId'];
+          if (productId != null && !productDocs.containsKey(productId)) {
+            final productRef = _firestore.collection('products').doc(productId);
+            final productSnap = await transaction.get(productRef);
+            if (productSnap.exists) {
+              productDocs[productId] = productSnap;
+            }
+          }
+        }
+
+        for (var item in items) {
+          final productId = item['productId'];
+          final qty = item['quantity'] ?? 1;
+          if (productId != null && productDocs.containsKey(productId)) {
+            final productSnap = productDocs[productId]!;
+            final currentQty = (productSnap.data() as Map<String, dynamic>)['totalQuantity'] ?? 999;
+            if (currentQty != 999) {
+              if (currentQty < qty) {
+                throw Exception('Not enough stock for ${item['name']}');
+              }
+              final productRef = _firestore.collection('products').doc(productId);
+              transaction.update(productRef, {
+                'totalQuantity': FieldValue.increment(-qty),
+              });
+            }
           }
         }
 
         final newOrderRef = _firestore.collection('orders').doc();
         transaction.set(newOrderRef, orderData);
-        
-        return true;
       });
+      return null; // null means success
     } catch (e) {
       print('Error submitting order: $e');
-      return false;
+      if (e.toString().contains('Not enough points')) {
+        return '보유하신 포인트가 부족합니다.';
+      }
+      if (e.toString().contains('Not enough stock')) {
+        return '일부 상품의 재고가 부족합니다.';
+      }
+      return '주문 전송에 실패했습니다. 다시 시도해주세요.';
     }
   }
 
@@ -110,6 +163,21 @@ class OrderService {
           for (var item in items) {
             if (item['isBankTransferOnly'] != true) {
               refundKrw += (item['totalPriceKrw'] ?? 0).toDouble();
+            }
+            // Restore inventory
+            final productId = item['productId'];
+            final qty = item['quantity'] ?? 1;
+            if (productId != null) {
+              final productRef = _firestore.collection('products').doc(productId);
+              final productSnap = await transaction.get(productRef);
+              if (productSnap.exists) {
+                final currentQty = (productSnap.data() as Map<String, dynamic>)['totalQuantity'] ?? 999;
+                if (currentQty != 999) {
+                  transaction.update(productRef, {
+                    'totalQuantity': FieldValue.increment(qty),
+                  });
+                }
+              }
             }
           }
           
@@ -203,6 +271,21 @@ class OrderService {
           for (var item in items) {
             if (item['isBankTransferOnly'] != true) {
               refundKrw += (item['totalPriceKrw'] ?? 0).toDouble();
+            }
+            // Restore inventory
+            final productId = item['productId'];
+            final qty = item['quantity'] ?? 1;
+            if (productId != null) {
+              final productRef = _firestore.collection('products').doc(productId);
+              final productSnap = await transaction.get(productRef);
+              if (productSnap.exists) {
+                final currentQty = (productSnap.data() as Map<String, dynamic>)['totalQuantity'] ?? 999;
+                if (currentQty != 999) {
+                  transaction.update(productRef, {
+                    'totalQuantity': FieldValue.increment(qty),
+                  });
+                }
+              }
             }
           }
           
@@ -470,6 +553,87 @@ class OrderService {
       });
     } catch (e) {
       print('Error processing return: $e');
+      return false;
+    }
+  }
+
+  // 6. Request return for a specific rental item
+  Future<bool> requestReturnForItem(String orderId, String productId) async {
+    try {
+      return await _firestore.runTransaction((transaction) async {
+        final orderRef = _firestore.collection('orders').doc(orderId);
+        final freshSnap = await transaction.get(orderRef);
+        if (!freshSnap.exists) return false;
+        
+        final orderData = freshSnap.data() as Map<String, dynamic>;
+        final items = List<dynamic>.from(orderData['items'] ?? []);
+        bool updated = false;
+        
+        for (int i = 0; i < items.length; i++) {
+          final item = Map<String, dynamic>.from(items[i]);
+          if (item['productId'] == productId && item['type'] == 'rent' && item['returnStatus'] != 'returned') {
+            item['returnStatus'] = 'return_requested';
+            items[i] = item;
+            updated = true;
+          }
+        }
+        
+        if (updated) {
+          transaction.update(orderRef, {'items': items});
+        }
+        return updated;
+      });
+    } catch (e) {
+      print('Error requesting return: $e');
+      return false;
+    }
+  }
+
+  // 7. Admin updates return status for a rental item
+  Future<bool> updateItemReturnStatusByAdmin(String orderId, String productId, String newReturnStatus) async {
+    try {
+      return await _firestore.runTransaction((transaction) async {
+        final orderRef = _firestore.collection('orders').doc(orderId);
+        final freshSnap = await transaction.get(orderRef);
+        if (!freshSnap.exists) return false;
+        
+        final orderData = freshSnap.data() as Map<String, dynamic>;
+        final items = List<dynamic>.from(orderData['items'] ?? []);
+        bool updated = false;
+        int qtyToRestore = 0;
+        
+        for (int i = 0; i < items.length; i++) {
+          final item = Map<String, dynamic>.from(items[i]);
+          if (item['productId'] == productId && item['type'] == 'rent') {
+            item['returnStatus'] = newReturnStatus;
+            items[i] = item;
+            updated = true;
+            if (newReturnStatus == 'returned') {
+              qtyToRestore = item['quantity'] ?? 1;
+            }
+          }
+        }
+        
+        if (updated) {
+          transaction.update(orderRef, {'items': items});
+          
+          if (newReturnStatus == 'returned' && qtyToRestore > 0) {
+            final productRef = _firestore.collection('products').doc(productId);
+            final productSnap = await transaction.get(productRef);
+            if (productSnap.exists) {
+              final currentQty = (productSnap.data() as Map<String, dynamic>)['totalQuantity'] ?? 999;
+              if (currentQty != 999) {
+                transaction.update(productRef, {
+                  'totalQuantity': FieldValue.increment(qtyToRestore),
+                });
+              }
+            }
+          }
+        }
+        return updated;
+      });
+    } catch (e) {
+      print('Error updating return status: $e');
       return false;
     }
   }

@@ -28,12 +28,12 @@ class _AdminPointManagementDialogState extends State<AdminPointManagementDialog>
     final amountStr = _amountController.text.replaceAll(',', '').trim();
     final desc = _descController.text.trim();
     if (amountStr.isEmpty || desc.isEmpty) {
-      UiUtils.showPopup(context, '금액과 사유를 모두 입력해주세요.');
+      UiUtils.showPopup(context, '포인트와 사유를 모두 입력해주세요.');
       return;
     }
     final amount = double.tryParse(amountStr);
     if (amount == null || amount <= 0) {
-      UiUtils.showPopup(context, '올바른 금액을 입력해주세요.');
+      UiUtils.showPopup(context, '올바른 포인트를 입력해주세요.');
       return;
     }
 
@@ -208,7 +208,7 @@ class _AdminPointManagementDialogState extends State<AdminPointManagementDialog>
                     controller: _amountController,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: '금액',
+                      labelText: '포인트',
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),

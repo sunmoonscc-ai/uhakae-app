@@ -108,14 +108,14 @@ class _AdminProductManagementTabState extends State<AdminProductManagementTab> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: priceCtrl,
-                      decoration: const InputDecoration(labelText: '가격 (원)'),
+                      decoration: const InputDecoration(labelText: '가격'),
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 8),
                     if (widget.productType == 'rent') ...[
                       TextField(
                         controller: depositCtrl,
-                        decoration: const InputDecoration(labelText: '보증금 (원)'),
+                        decoration: const InputDecoration(labelText: '보증금'),
                         keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 8),

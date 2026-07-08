@@ -153,12 +153,12 @@ class ProductCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.savings_outlined, color: Colors.blueAccent, size: 18),
+                        Icon(Icons.savings_outlined, color: product.isBankTransferOnly ? Colors.blueAccent : Colors.redAccent, size: 18),
                         const SizedBox(width: 2),
                         Text(
                           currencyFormatter.format(product.priceKrw),
-                          style: const TextStyle(
-                              color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                          style: TextStyle(
+                              color: product.isBankTransferOnly ? Colors.blueAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         const SizedBox(width: 8),
                         if (product.type == 'rent' && product.depositKrw > 0)

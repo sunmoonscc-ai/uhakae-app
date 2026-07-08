@@ -39,7 +39,7 @@ class _CartScreenState extends State<CartScreen> {
       }).toList(),
     };
 
-    final success = await _orderService.submitOrder(orderData);
+    final errorMessage = await _orderService.submitOrder(orderData);
 
     setState(() {
       _isSubmitting = false;
@@ -47,7 +47,7 @@ class _CartScreenState extends State<CartScreen> {
 
     if (!mounted) return;
 
-    if (success) {
+    if (errorMessage == null) {
       cart.clear();
       showDialog(
         context: context,
@@ -70,7 +70,7 @@ class _CartScreenState extends State<CartScreen> {
       );
     } else {
       if (context.mounted) {
-        UiUtils.showPopup(context, '주문 전송에 실패했습니다. 다시 시도해주세요.');
+        UiUtils.showPopup(context, errorMessage);
       }
     }
   }
@@ -174,7 +174,7 @@ class _CartScreenState extends State<CartScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('총 결제금액', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          const Text('총 결제 포인트', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [

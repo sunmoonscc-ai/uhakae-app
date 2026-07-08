@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:study_abroad_app/models/order_model.dart';
 import 'package:study_abroad_app/services/order_service.dart';
@@ -13,6 +14,23 @@ class OrderHistoryScreen extends StatefulWidget {
 
 class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   final OrderService _orderService = OrderService();
+
+  Future<void> _requestReturn(String orderId, Map<String, dynamic> item) async {
+    final bool success = await _orderService.requestReturnForItem(orderId, item['productId']);
+    if (success) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('반납 요청이 접수되었습니다.')),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('반납 요청 처리에 실패했습니다.')),
+        );
+      }
+    }
+  }
 
   String _getStatusText(String status) {
     switch (status) {
@@ -56,7 +74,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('내 주문 내역'),
@@ -69,6 +87,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             indicatorColor: Colors.blue,
             tabs: [
               Tab(text: '진행중'),
+              Tab(text: '대여중'),
               Tab(text: '완료'),
             ],
           ),
@@ -94,12 +113,14 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             }
 
             final inProgressOrders = orders.where((o) => !['completed', 'rejected', 'canceled'].contains(o.status)).toList();
-            final completedOrders = orders.where((o) => ['completed', 'rejected', 'canceled'].contains(o.status)).toList();
+            final rentingOrders = orders.where((o) => o.status == 'completed' && o.items.any((item) => item['type'] == 'rent' && item['returnStatus'] != 'returned')).toList();
+            final completedOrders = orders.where((o) => ['completed', 'rejected', 'canceled'].contains(o.status) && !rentingOrders.contains(o)).toList();
 
             return TabBarView(
               children: [
-                _buildOrderList(inProgressOrders),
-                _buildOrderList(completedOrders),
+                _buildOrderList(inProgressOrders, isRentingTab: false),
+                _buildOrderList(rentingOrders, isRentingTab: true),
+                _buildOrderList(completedOrders, isRentingTab: false),
               ],
             );
           },
@@ -110,7 +131,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
   bool _isDescending = true;
 
-  Widget _buildOrderList(List<OrderModel> orders) {
+  Widget _buildOrderList(List<OrderModel> orders, {bool isRentingTab = false}) {
     if (orders.isEmpty) {
       return const Center(child: Text('주문 내역이 없습니다.'));
     }
@@ -179,16 +200,46 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                             final rejectReason = item['rejectReason'] ?? '사유 없음';
                             final rejectText = isRejected ? ' (거절됨: $rejectReason)' : '';
 
+                            final returnStatus = item['returnStatus'];
+                            
+                            Widget returnUi = const SizedBox.shrink();
+                            if (isRentingTab && item['type'] == 'rent' && returnStatus != 'returned') {
+                              if (returnStatus == 'return_requested') {
+                                returnUi = const Text(' [반납요청됨]', style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold));
+                              } else if (returnStatus == 'return_preparing') {
+                                returnUi = const Text(' [회수준비중]', style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold));
+                              } else {
+                                returnUi = TextButton(
+                                  onPressed: () {
+                                    _requestReturn(order.id, item);
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('반납요청', style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold)),
+                                );
+                              }
+                            }
+
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 4.0),
-                              child: Text(
-                                '${item['name']} x ${item['quantity']}$rejectText',
-                                style: TextStyle(
-                                  fontWeight: isRejected ? FontWeight.normal : FontWeight.bold, 
-                                  fontSize: 14,
-                                  color: isRejected ? Colors.grey : null,
-                                  decoration: isRejected ? TextDecoration.lineThrough : null,
-                                ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${item['name']} x ${item['quantity']}$rejectText',
+                                      style: TextStyle(
+                                        fontWeight: isRejected ? FontWeight.normal : FontWeight.bold, 
+                                        fontSize: 14,
+                                        color: isRejected ? Colors.grey : null,
+                                        decoration: isRejected ? TextDecoration.lineThrough : null,
+                                      ),
+                                    ),
+                                  ),
+                                  if (returnUi != const SizedBox.shrink()) returnUi,
+                                ],
                               ),
                             );
                           }).toList(),
@@ -226,55 +277,87 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                       if (order.status == 'pending' || order.status == 'approved')
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              OutlinedButton(
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: const Text('주문 취소'),
-                                      content: const Text('주문을 취소하시겠습니까?'),
-                                      actions: [
-                                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('아니오')),
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.pop(context);
-                                            _orderService.updateOrderStatusByUser(order.id, 'canceled');
-                                          },
-                                          child: const Text('예', style: TextStyle(color: Colors.red)),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  minimumSize: Size.zero,
-                                ),
-                                child: const Text('주문 취소', style: TextStyle(fontSize: 12)),
-                              ),
-                              if (order.status == 'approved' && orderHasBankTransferOnly) ...[
-                                const SizedBox(width: 8),
-                                if (order.isTransferNotified)
-                                  const Text('송금 확인 대기중', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13))
-                                else
-                                  ElevatedButton(
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  OutlinedButton(
                                     onPressed: () {
-                                      _orderService.notifyBankTransfer(order.id);
-                                      if (context.mounted) {
-                                        UiUtils.showPopup(context, '관리자에게 송금 완료 알림이 전송되었습니다.');
-                                      }
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('주문 취소'),
+                                          content: const Text('주문을 취소하시겠습니까?'),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(context), child: const Text('아니오')),
+                                            TextButton(
+                                              onPressed: () {
+                                                Navigator.pop(context);
+                                                _orderService.updateOrderStatusByUser(order.id, 'canceled');
+                                              },
+                                              child: const Text('예', style: TextStyle(color: Colors.red)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
                                     },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.red,
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       minimumSize: Size.zero,
                                     ),
-                                    child: const Text('계좌이체 완료 알림', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                    child: const Text('주문 취소', style: TextStyle(fontSize: 12)),
                                   ),
+                                  if (order.status == 'approved' && orderHasBankTransferOnly) ...[
+                                    const SizedBox(width: 8),
+                                    if (order.isTransferNotified)
+                                      const Text('송금 확인 대기중', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13))
+                                    else
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          _orderService.notifyBankTransfer(order.id);
+                                          if (context.mounted) {
+                                            UiUtils.showPopup(context, '관리자에게 송금 완료 알림이 전송되었습니다.');
+                                          }
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.amber.shade300,
+                                          foregroundColor: Colors.black,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          minimumSize: Size.zero,
+                                        ),
+                                        child: const Text('위 금액을 계좌이체 후 눌러주세요.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      ),
+                                  ],
+                                ],
+                              ),
+                              if (order.status == 'approved' && orderHasBankTransferOnly && !order.isTransferNotified) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    const Text('KB(국민은행) 484637-04-010357 김인환', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 8),
+                                    InkWell(
+                                      onTap: () {
+                                        Clipboard.setData(const ClipboardData(text: '48463704010357'));
+                                        if (context.mounted) {
+                                          UiUtils.showPopup(context, '계좌번호가 복사되었습니다.');
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          border: Border.all(color: Colors.grey),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text('(복사하기)', style: TextStyle(fontSize: 12)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ],
                           ),
@@ -415,7 +498,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('총 결제 금액', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text('총 결제 포인트', style: TextStyle(fontWeight: FontWeight.bold)),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

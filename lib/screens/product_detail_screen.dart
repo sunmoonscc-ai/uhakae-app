@@ -236,7 +236,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('총 물품 금액', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const Text('총 필요 포인트', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
