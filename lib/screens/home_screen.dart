@@ -10,6 +10,7 @@ import 'post_detail_screen.dart';
 import 'info_screen.dart';
 import '../services/preferences_service.dart';
 import '../widgets/admin_notification_badge.dart';
+import '../widgets/user_notification_badge.dart';
 
 import 'package:study_abroad_app/main.dart';
 import '../models/business_model.dart';
@@ -105,7 +106,9 @@ class HomeScreen extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (name == '관리자')
-                            const AdminNotificationBadge(),
+                            const AdminNotificationBadge()
+                          else
+                            const UserNotificationBadge(),
                           Text(
                             '안녕하세요, $name님!',
                             style: TextStyle(
@@ -609,13 +612,15 @@ class _NoticeSectionState extends State<_NoticeSection> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '쪽지',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
+            if (PreferencesService.isAdmin) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '쪽지',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
+                ),
               ),
-            ),
+            ],
           ],
         ),
         const SizedBox(height: 12),
@@ -642,30 +647,32 @@ class _NoticeSectionState extends State<_NoticeSection> {
                   },
                 ),
               ),
-              const SizedBox(width: 12),
-              // 오른쪽 칸: 쪽지 목록
-              Expanded(
-                flex: 1,
-                child: _isLoadingMessage 
-                  ? const Center(child: CircularProgressIndicator())
-                  : (_messageStream == null 
-                     ? _buildEmptyBox(isDarkMode, '쪽지가 없습니다.')
-                     : StreamBuilder<QuerySnapshot>(
-                         stream: _messageStream,
-                         builder: (context, snapshot) {
-                            if (snapshot.hasError) return _buildEmptyBox(isDarkMode, '오류가 발생했습니다.');
-                            if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                            return _buildListPane(
-                              context: context, 
-                              isDarkMode: isDarkMode, 
-                              docs: snapshot.data?.docs ?? [], 
-                              emptyText: '쪽지가 없습니다.',
-                              isNotice: false,
-                            );
-                         }
-                       )
-                    ),
-              ),
+              if (PreferencesService.isAdmin) ...[
+                const SizedBox(width: 12),
+                // 오른쪽 칸: 쪽지 목록
+                Expanded(
+                  flex: 1,
+                  child: _isLoadingMessage 
+                    ? const Center(child: CircularProgressIndicator())
+                    : (_messageStream == null 
+                       ? _buildEmptyBox(isDarkMode, '쪽지가 없습니다.')
+                       : StreamBuilder<QuerySnapshot>(
+                           stream: _messageStream,
+                           builder: (context, snapshot) {
+                              if (snapshot.hasError) return _buildEmptyBox(isDarkMode, '오류가 발생했습니다.');
+                              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                              return _buildListPane(
+                                context: context, 
+                                isDarkMode: isDarkMode, 
+                                docs: snapshot.data?.docs ?? [], 
+                                emptyText: '쪽지가 없습니다.',
+                                isNotice: false,
+                              );
+                           }
+                         )
+                      ),
+                ),
+              ],
             ],
           ),
         ),
