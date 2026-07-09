@@ -31,6 +31,9 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
   final ImagePicker _picker = ImagePicker();
   final List<XFile> _selectedImages = [];
   bool _isUploadingImages = false;
+
+  List<Map<String, dynamic>> _users = [];
+  String? _selectedUserId;
   
   final List<String> _adminEmails = [
     'cebufriends79@gmail.com',
@@ -46,6 +49,10 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
     final user = FirebaseAuth.instance.currentUser;
     final bool isAdmin = user != null && _adminEmails.contains(user.email);
     
+    if (isAdmin) {
+      _fetchUsers();
+    }
+    
     if (widget.editPostData != null) {
       _titleController.text = widget.editPostData!['title'] ?? '';
       _contentController.text = widget.editPostData!['content'] ?? '';
@@ -58,6 +65,22 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
       } else {
         _selectedCategory = 'community';
       }
+    }
+  }
+
+  Future<void> _fetchUsers() async {
+    final snap = await FirebaseFirestore.instance.collection('users').get();
+    if (mounted) {
+      setState(() {
+        _users = snap.docs.map((doc) => {
+          'id': doc.id,
+          'email': doc.data()['email'] ?? '',
+          'nickname': doc.data()['nickname'] ?? doc.data()['name'] ?? '알 수 없음',
+        }).toList();
+        if (_users.isNotEmpty && _selectedUserId == null) {
+          _selectedUserId = _users.first['id'];
+        }
+      });
     }
   }
 
@@ -125,6 +148,41 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
         finalImageUrls.addAll(List<String>.from(widget.editPostData!['image_urls']));
       }
       finalImageUrls.addAll(imageUrls);
+
+      if (_selectedCategory == 'individual_notice') {
+        if (isAdmin && _selectedUserId == null) {
+          UiUtils.showPopup(context, '받는 사람을 선택해주세요.');
+          return;
+        }
+
+        final personalNoticeData = {
+          'title': _titleController.text,
+          'content': _contentController.text,
+          'image_urls': finalImageUrls,
+          'createdAt': FieldValue.serverTimestamp(),
+          'userId': isAdmin ? _selectedUserId : user.uid,
+          'senderName': user.displayName ?? '사용자',
+          'isFromUser': !isAdmin,
+          'isRead': false,
+        };
+
+        if (widget.editPostId != null) {
+          personalNoticeData['updatedAt'] = FieldValue.serverTimestamp();
+          await FirebaseFirestore.instance.collection('personal_notices').doc(widget.editPostId).update(personalNoticeData);
+          if (mounted) {
+            UiUtils.showPopup(context, '쪽지가 수정되었습니다.');
+            Navigator.pop(context);
+          }
+          return;
+        }
+
+        await FirebaseFirestore.instance.collection('personal_notices').add(personalNoticeData);
+        if (mounted) {
+          UiUtils.showPopup(context, '쪽지가 전송되었습니다.');
+          Navigator.pop(context);
+        }
+        return;
+      }
 
       final postData = {
         'title': _titleController.text,
@@ -247,9 +305,55 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                     },
                   )
                 else
-                  Text('자유 게시판', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16)),
+                  DropdownButton<String>(
+                    value: _selectedCategory,
+                    dropdownColor: isDarkMode ? Colors.grey[900] : Colors.white,
+                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    items: const [
+                      DropdownMenuItem(value: 'individual_notice', child: Text('쪽지')),
+                      DropdownMenuItem(value: 'community', child: Text('자유 게시판')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _selectedCategory = val);
+                      }
+                    },
+                  ),
               ],
             ),
+            if (_selectedCategory == 'individual_notice')
+              Padding(
+                padding: const EdgeInsets.only(top: 16.0),
+                child: Row(
+                  children: [
+                    Text('받는 사람:', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+                    const SizedBox(width: 16),
+                    if (!isAdmin)
+                      Text('관리자', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16))
+                    else
+                      Expanded(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: _selectedUserId,
+                          hint: const Text('사용자를 선택하세요'),
+                          dropdownColor: isDarkMode ? Colors.grey[900] : Colors.white,
+                          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                          items: _users.map((user) {
+                            return DropdownMenuItem<String>(
+                              value: user['id'],
+                              child: Text('${user['nickname']} (${user['email']})', overflow: TextOverflow.ellipsis),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _selectedUserId = val);
+                            }
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             Divider(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
             TextField(
               controller: _titleController,

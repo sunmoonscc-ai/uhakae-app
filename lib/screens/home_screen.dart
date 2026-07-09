@@ -144,18 +144,14 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ),
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    _FavoriteListSection(title: '즐겨찾기 메뉴', type: 'menu'),
-                  ],
-                ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  _FavoriteListSection(title: '즐겨찾기 메뉴', type: 'menu'),
+                ],
               ),
             ),
           ),
@@ -290,7 +286,7 @@ class _FavoriteListSectionState extends State<_FavoriteListSection> {
                   ),
                 ],
               ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),
           ],
         );
       }
@@ -411,8 +407,9 @@ class _NoticeSection extends StatefulWidget {
 }
 
 class _NoticeSectionState extends State<_NoticeSection> {
-  int _selectedIndex = 0;
   late final Stream<QuerySnapshot> _noticeStream;
+  Stream<QuerySnapshot>? _messageStream;
+  bool _isLoadingMessage = true;
 
   @override
   void initState() {
@@ -421,6 +418,154 @@ class _NoticeSectionState extends State<_NoticeSection> {
         .collection('posts')
         .where('category', isEqualTo: 'notice')
         .snapshots();
+    _initMessageStream();
+  }
+
+  Future<void> _initMessageStream() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final snap = await FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).get();
+      if (snap.docs.isNotEmpty) {
+        final docId = snap.docs.first.id;
+        _messageStream = FirebaseFirestore.instance.collection('personal_notices').where('userId', isEqualTo: docId).snapshots();
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _isLoadingMessage = false;
+      });
+    }
+  }
+
+  Widget _buildEmptyBox(bool isDarkMode, String text) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey[900] : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+      ),
+      child: Center(
+        child: Text(text, textAlign: TextAlign.center, style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
+      ),
+    );
+  }
+
+  Widget _buildListPane({
+    required BuildContext context,
+    required bool isDarkMode,
+    required List<QueryDocumentSnapshot> docs,
+    required String emptyText,
+    required bool isNotice,
+  }) {
+    if (docs.isEmpty) {
+      return _buildEmptyBox(isDarkMode, emptyText);
+    }
+
+    var modifiableDocs = List<QueryDocumentSnapshot>.from(docs);
+    modifiableDocs.sort((a, b) {
+      final aMap = a.data() as Map<String, dynamic>;
+      final bMap = b.data() as Map<String, dynamic>;
+      final aTime = isNotice ? aMap['created_at'] as Timestamp? : aMap['createdAt'] as Timestamp?;
+      final bTime = isNotice ? bMap['created_at'] as Timestamp? : bMap['createdAt'] as Timestamp?;
+      
+      if (aTime == null && bTime == null) return 0;
+      if (aTime == null) return -1;
+      if (bTime == null) return 1;
+      return bTime.compareTo(aTime);
+    });
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey[900] : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: modifiableDocs.map((doc) {
+                  final n = doc.data() as Map<String, dynamic>;
+                  // We avoid setting n['id'] = doc.id for messages to prevent PostDetailScreen from crashing trying to fetch from 'posts'
+                  if (isNotice) {
+                    n['id'] = doc.id;
+                  } else {
+                    n['category'] = 'individual_notice';
+                  }
+                  
+                  final title = n['title'] ?? '제목 없음';
+                  String titleWithDate = title;
+                  final timestamp = isNotice ? n['created_at'] : n['createdAt'];
+                  if (timestamp != null) {
+                    final Timestamp ts = timestamp as Timestamp;
+                    final DateTime dt = ts.toDate();
+                    final yy = dt.year.toString().substring(2);
+                    final mm = dt.month.toString().padLeft(2, '0');
+                    final dd = dt.day.toString().padLeft(2, '0');
+                    titleWithDate = '$yy.$mm.$dd $title';
+                  } else {
+                    titleWithDate = '방금 전 $title';
+                  }
+                  
+                  return InkWell(
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => PostDetailScreen(postData: n)));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), 
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: doc == modifiableDocs.last ? Colors.transparent : (isDarkMode ? Colors.white12 : Colors.grey.shade200),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              titleWithDate,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDarkMode ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          InkWell(
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const CommunityScreen()));
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    '더보기', 
+                    style: TextStyle(color: isDarkMode ? Colors.blue[300] : Colors.blue, fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  Icon(Icons.chevron_right, size: 16, color: isDarkMode ? Colors.blue[300] : Colors.blue),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -430,251 +575,73 @@ class _NoticeSectionState extends State<_NoticeSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '공지사항',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '공지사항',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '쪽지',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        StreamBuilder<QuerySnapshot>(
-          stream: _noticeStream,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Text('오류가 발생했습니다.', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black));
-            }
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(child: CircularProgressIndicator(color: isDarkMode ? Colors.white : Colors.blue));
-            }
-
-            var docs = snapshot.data?.docs ?? [];
-            
-            var modifiableDocs = List<QueryDocumentSnapshot>.from(docs);
-            modifiableDocs.sort((a, b) {
-              final aMap = a.data() as Map<String, dynamic>;
-              final bMap = b.data() as Map<String, dynamic>;
-              final aTime = aMap['created_at'] as Timestamp?;
-              final bTime = bMap['created_at'] as Timestamp?;
-              
-              if (aTime == null && bTime == null) return 0;
-              if (aTime == null) return -1;
-              if (bTime == null) return 1;
-              return bTime.compareTo(aTime);
-            });
-            
-            if (modifiableDocs.isEmpty) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.grey[900] : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+        SizedBox(
+          height: 160,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch, 
+            children: [
+              // 왼쪽 칸: 공지사항 목록
+              Expanded(
+                flex: 1,
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _noticeStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) return _buildEmptyBox(isDarkMode, '오류가 발생했습니다.');
+                    if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                    return _buildListPane(
+                      context: context, 
+                      isDarkMode: isDarkMode, 
+                      docs: snapshot.data?.docs ?? [], 
+                      emptyText: '등록된 공지사항이 없습니다.',
+                      isNotice: true,
+                    );
+                  },
                 ),
-                child: Text('등록된 공지사항이 없습니다.', textAlign: TextAlign.center, style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
-              );
-            }
-
-            if (_selectedIndex >= modifiableDocs.length) {
-              _selectedIndex = 0;
-            }
-
-            final selectedDoc = modifiableDocs[_selectedIndex].data() as Map<String, dynamic>;
-            selectedDoc['id'] = modifiableDocs[_selectedIndex].id;
-            final selectedTitle = selectedDoc['title'] ?? '제목 없음';
-            final selectedContent = selectedDoc['content'] ?? '';
-            String selectedTitleWithDate = selectedTitle;
-            if (selectedDoc['created_at'] != null) {
-              final Timestamp ts = selectedDoc['created_at'];
-              final DateTime dt = ts.toDate();
-              final yy = dt.year.toString().substring(2);
-              final mm = dt.month.toString().padLeft(2, '0');
-              final dd = dt.day.toString().padLeft(2, '0');
-              selectedTitleWithDate = '$yy.$mm.$dd $selectedTitle';
-            } else {
-              selectedTitleWithDate = '방금 전 $selectedTitle';
-            }
-            return SizedBox(
-              height: 160, // 스크롤을 위해 고정 높이 지정 (오른쪽 3줄 표시 및 왼쪽 4개 딱 맞춤)
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch, 
-                children: [
-                    // 왼쪽 칸: 공지사항 목록
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[900] : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
-                      ),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                children: [
-                                    ...List.generate(modifiableDocs.length, (index) {
-                                      final n = modifiableDocs[index].data() as Map<String, dynamic>;
-                                      n['id'] = modifiableDocs[index].id;
-                                      final title = n['title'] ?? '제목 없음';
-                                      String titleWithDate = title;
-                                      if (n['created_at'] != null) {
-                                        final Timestamp ts = n['created_at'];
-                                        final DateTime dt = ts.toDate();
-                                        final yy = dt.year.toString().substring(2);
-                                        final mm = dt.month.toString().padLeft(2, '0');
-                                        final dd = dt.day.toString().padLeft(2, '0');
-                                        titleWithDate = '$yy.$mm.$dd $title';
-                                      } else {
-                                        titleWithDate = '방금 전 $title';
-                                      }
-                                      
-                                      final isSelected = _selectedIndex == index;
-                                      return InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedIndex = index;
-                                        });
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), 
-                                        decoration: BoxDecoration(
-                                          color: isSelected 
-                                              ? (isDarkMode ? Colors.grey[800] : Colors.blue.shade50) 
-                                              : Colors.transparent,
-                                          border: Border(
-                                            bottom: BorderSide(
-                                              color: index == modifiableDocs.length - 1 ? Colors.transparent : (isDarkMode ? Colors.white12 : Colors.grey.shade200),
-                                            ),
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                titleWithDate,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                                                  color: isSelected 
-                                                      ? (isDarkMode ? Colors.blue[300] : Colors.blue[700]) 
-                                                      : (isDarkMode ? Colors.white : Colors.black87),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  }),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Column(
-                            children: [
-                              const Divider(height: 1),
-                              InkWell(
-                                onTap: () {
-                                  Navigator.push(context, MaterialPageRoute(builder: (context) => const CommunityScreen()));
-                                },
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        '더보기', 
-                                        style: TextStyle(color: isDarkMode ? Colors.blue[300] : Colors.blue, fontWeight: FontWeight.bold, fontSize: 13),
-                                      ),
-                                      Icon(Icons.chevron_right, size: 16, color: isDarkMode ? Colors.blue[300] : Colors.blue),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // 오른쪽 칸: 미리보기
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      padding: const EdgeInsets.only(top: 12, left: 16, right: 16, bottom: 0),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[900] : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    selectedTitleWithDate,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: isDarkMode ? Colors.white : Colors.black,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    selectedContent,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: isDarkMode ? Colors.white70 : Colors.black87,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Column(
-                            children: [
-                              const SizedBox(height: 8),
-                              const Divider(height: 1),
-                              InkWell(
-                                onTap: () {
-                                  Navigator.push(context, MaterialPageRoute(builder: (context) => PostDetailScreen(postData: selectedDoc)));
-                                },
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        '자세히보기', 
-                                        style: TextStyle(color: isDarkMode ? Colors.blue[300] : Colors.blue, fontWeight: FontWeight.bold, fontSize: 13),
-                                      ),
-                                      Icon(Icons.chevron_right, size: 16, color: isDarkMode ? Colors.blue[300] : Colors.blue),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
               ),
-            );
-          },
+              const SizedBox(width: 12),
+              // 오른쪽 칸: 쪽지 목록
+              Expanded(
+                flex: 1,
+                child: _isLoadingMessage 
+                  ? const Center(child: CircularProgressIndicator())
+                  : (_messageStream == null 
+                     ? _buildEmptyBox(isDarkMode, '쪽지가 없습니다.')
+                     : StreamBuilder<QuerySnapshot>(
+                         stream: _messageStream,
+                         builder: (context, snapshot) {
+                            if (snapshot.hasError) return _buildEmptyBox(isDarkMode, '오류가 발생했습니다.');
+                            if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                            return _buildListPane(
+                              context: context, 
+                              isDarkMode: isDarkMode, 
+                              docs: snapshot.data?.docs ?? [], 
+                              emptyText: '쪽지가 없습니다.',
+                              isNotice: false,
+                            );
+                         }
+                       )
+                    ),
+              ),
+            ],
+          ),
         ),
       ],
     );
