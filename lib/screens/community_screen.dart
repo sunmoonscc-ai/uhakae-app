@@ -574,9 +574,8 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
           itemBuilder: (context, index) {
             final doc = modifiableDocs[index];
             final data = doc.data() as Map<String, dynamic>;
-            if (category != 'individual_notice') {
-              data['id'] = doc.id;
-            } else {
+            data['id'] = doc.id;
+            if (category == 'individual_notice') {
               data['category'] = 'individual_notice';
             }
             final title = data['title'] ?? '제목 없음';

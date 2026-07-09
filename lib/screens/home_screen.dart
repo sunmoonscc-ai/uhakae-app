@@ -488,10 +488,8 @@ class _NoticeSectionState extends State<_NoticeSection> {
               child: Column(
                 children: modifiableDocs.map((doc) {
                   final n = doc.data() as Map<String, dynamic>;
-                  // We avoid setting n['id'] = doc.id for messages to prevent PostDetailScreen from crashing trying to fetch from 'posts'
-                  if (isNotice) {
-                    n['id'] = doc.id;
-                  } else {
+                  n['id'] = doc.id;
+                  if (!isNotice) {
                     n['category'] = 'individual_notice';
                   }
                   
