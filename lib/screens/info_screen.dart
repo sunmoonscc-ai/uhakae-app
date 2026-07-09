@@ -263,7 +263,11 @@ class _InfoScreenState extends State<InfoScreen> {
                     final isSelected = mainCategory == catName;
                     return InkWell(
                       onTap: () {
-                        infoMainCategoryNotifier.value = catName;
+                        if (catName == '커뮤니티') {
+                          CommunityScreen.showPopup(context, initialTabIndex: 1);
+                        } else {
+                          infoMainCategoryNotifier.value = catName;
+                        }
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -650,8 +654,6 @@ class _InfoScreenState extends State<InfoScreen> {
                             );
                           } else if (mainCategory == '주요연락처') {
                             return ContactScreen(region: region);
-                          } else if (mainCategory == '커뮤니티') {
-                            return CommunityScreen(showAppBar: false, region: region);
                           }
                           return const SizedBox.shrink();
                         },

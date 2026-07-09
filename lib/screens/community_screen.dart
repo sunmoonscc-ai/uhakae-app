@@ -22,6 +22,22 @@ class CommunityScreen extends StatefulWidget {
   final bool isDialog;
   const CommunityScreen({super.key, this.showAppBar = true, this.region = '전체', this.initialTabIndex = 0, this.isDialog = false});
 
+  static void showPopup(BuildContext context, {int initialTabIndex = 0}) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        clipBehavior: Clip.antiAliasWithSaveLayer,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: SizedBox(
+          width: double.infinity,
+          height: MediaQuery.of(context).size.height * 0.8,
+          child: CommunityScreen(initialTabIndex: initialTabIndex, isDialog: true),
+        ),
+      ),
+    );
+  }
+
   @override
   State<CommunityScreen> createState() => _CommunityScreenState();
 }
@@ -615,29 +631,36 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
             }
 
             bool isNoticeUnread = false;
-            if (!isAdmin) {
-              if (category == 'notice') {
+            if (category == 'notice') {
+              if (!isAdmin) {
                 isNoticeUnread = !PreferencesService.readNotices.contains(data['id']);
-              } else if (category == 'individual_notice') {
-                final bool isRead = data['isRead'] == true;
-                final bool isFromUser = data['isFromUser'] == true;
+              }
+            } else if (category == 'individual_notice') {
+              final bool isRead = data['isRead'] == true;
+              final bool isFromUser = data['isFromUser'] == true;
+              if (isAdmin) {
+                if (isFromUser && !isRead) {
+                  isNoticeUnread = true;
+                }
+              } else {
                 if (!isFromUser && !isRead) {
                   isNoticeUnread = true;
                 }
               }
             }
 
-            FontWeight fontWeight = FontWeight.bold;
-            Color titleColor = isDarkMode ? Colors.white : Colors.black;
+            FontWeight fontWeight = FontWeight.normal;
+            Color titleColor = Colors.grey;
 
-            if (!isAdmin && (category == 'notice' || category == 'individual_notice')) {
+            if (category == 'notice' || category == 'individual_notice') {
               if (isNoticeUnread) {
                 fontWeight = FontWeight.bold;
                 titleColor = isDarkMode ? Colors.white : Colors.black;
-              } else {
-                fontWeight = FontWeight.normal;
-                titleColor = Colors.grey;
               }
+            } else {
+              // General community posts
+              titleColor = isDarkMode ? Colors.white : Colors.black;
+              fontWeight = FontWeight.bold;
             }
 
             return Card(

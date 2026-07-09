@@ -69,9 +69,90 @@ class AdminNotificationBadge extends StatelessWidget {
 
                         return InkWell(
                           onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const AdminScreen(initialTab: '대시보드')),
+                            showDialog(
+                              context: context,
+                              builder: (ctx) {
+                                final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                                return Dialog(
+                                  backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    constraints: const BoxConstraints(maxWidth: 400, maxHeight: 500),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('알림', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+                                            IconButton(icon: Icon(Icons.close, color: isDarkMode ? Colors.white54 : Colors.black54), onPressed: () => Navigator.pop(ctx)),
+                                          ],
+                                        ),
+                                        const Divider(),
+                                        Expanded(
+                                          child: ListView(
+                                            children: [
+                                              if (orderSnapshot.hasData && orderSnapshot.data!.docs.isNotEmpty)
+                                                ListTile(
+                                                  leading: const Icon(Icons.shopping_cart, color: Colors.blue),
+                                                  title: Text('신규 주문 (${orderSnapshot.data!.docs.length}건)'),
+                                                  onTap: () {
+                                                    Navigator.pop(ctx);
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminScreen(initialTab: '쇼핑몰 관리')));
+                                                  },
+                                                ),
+                                              if (returnSnapshot.hasData && returnSnapshot.data!.docs.isNotEmpty)
+                                                ListTile(
+                                                  leading: const Icon(Icons.assignment_return, color: Colors.orange),
+                                                  title: Text('반품 요청 (${returnSnapshot.data!.docs.length}건)'),
+                                                  onTap: () {
+                                                    Navigator.pop(ctx);
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminScreen(initialTab: '쇼핑몰 관리')));
+                                                  },
+                                                ),
+                                              if (userSnapshot.hasData && userSnapshot.data!.docs.isNotEmpty)
+                                                ListTile(
+                                                  leading: const Icon(Icons.person_add, color: Colors.green),
+                                                  title: Text('신규 가입 대기 (${userSnapshot.data!.docs.length}명)'),
+                                                  onTap: () {
+                                                    Navigator.pop(ctx);
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminScreen(initialTab: '사용자 관리')));
+                                                  },
+                                                ),
+                                              if (infoSnapshot.hasData && infoSnapshot.data!.docs.isNotEmpty)
+                                                ListTile(
+                                                  leading: const Icon(Icons.info_outline, color: Colors.purple),
+                                                  title: Text('정보수정 제안 (${infoSnapshot.data!.docs.length}건)'),
+                                                  onTap: () {
+                                                    Navigator.pop(ctx);
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminScreen(initialTab: '정보수정제안')));
+                                                  },
+                                                ),
+                                              if (noticeSnapshot.hasData && noticeSnapshot.data!.docs.isNotEmpty)
+                                                ...noticeSnapshot.data!.docs.map((doc) {
+                                                  final data = doc.data() as Map<String, dynamic>;
+                                                  final senderName = data['senderName'] ?? '사용자';
+                                                  return ListTile(
+                                                    leading: const Icon(Icons.mark_email_unread, color: Colors.pink),
+                                                    title: Text('새 쪽지 ($senderName)'),
+                                                    onTap: () async {
+                                                      await doc.reference.update({'isRead': true});
+                                                      if (context.mounted) {
+                                                        Navigator.pop(ctx);
+                                                        Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminScreen(initialTab: '개별공지(쪽지)')));
+                                                      }
+                                                    },
+                                                  );
+                                                }).toList(),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
                             );
                           },
                           child: Padding(

@@ -511,12 +511,21 @@ class _NoticeSectionState extends State<_NoticeSection> {
                   }
                   bool isUnread = false;
                   final isAdmin = PreferencesService.isAdmin;
-                  if (!isAdmin) {
-                    if (isNotice) {
+                  if (isNotice) {
+                    // For notice, admins don't need to read, users check readNotices
+                    if (!isAdmin) {
                       isUnread = !PreferencesService.readNotices.contains(n['id']);
+                    }
+                  } else {
+                    final bool messageIsRead = n['isRead'] == true;
+                    final bool isFromUser = n['isFromUser'] == true;
+                    if (isAdmin) {
+                      // Admin sees user messages as unread if not read
+                      if (isFromUser && !messageIsRead) {
+                        isUnread = true;
+                      }
                     } else {
-                      final bool messageIsRead = n['isRead'] ?? false;
-                      final bool isFromUser = n['isFromUser'] ?? true;
+                      // User sees admin messages as unread if not read
                       if (!isFromUser && !messageIsRead) {
                         isUnread = true;
                       }
@@ -526,13 +535,11 @@ class _NoticeSectionState extends State<_NoticeSection> {
                   Color textColor = isDarkMode ? Colors.white : Colors.black87;
                   FontWeight fontWeight = FontWeight.normal;
 
-                  if (!isAdmin) {
-                    if (isUnread) {
-                      fontWeight = FontWeight.bold;
-                      textColor = isDarkMode ? Colors.white : Colors.black;
-                    } else {
-                      textColor = Colors.grey;
-                    }
+                  if (isUnread) {
+                    fontWeight = FontWeight.bold;
+                    textColor = isDarkMode ? Colors.white : Colors.black;
+                  } else {
+                    textColor = Colors.grey;
                   }
                   
                   return InkWell(
@@ -575,7 +582,7 @@ class _NoticeSectionState extends State<_NoticeSection> {
           const Divider(height: 1),
           InkWell(
             onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const CommunityScreen()));
+              CommunityScreen.showPopup(context, initialTabIndex: isNotice ? 0 : 1);
             },
             child: Container(
               width: double.infinity,

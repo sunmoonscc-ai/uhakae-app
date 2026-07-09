@@ -23,8 +23,24 @@ class _AdminPersonalNoticeTabState extends State<AdminPersonalNoticeTab> {
   Widget build(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').snapshots(),
-      builder: (context, snapshot) {
+      stream: FirebaseFirestore.instance.collection('personal_notices')
+          .where('isFromUser', isEqualTo: true)
+          .where('isRead', isEqualTo: false)
+          .snapshots(),
+      builder: (context, unreadSnapshot) {
+        final unreadDocs = unreadSnapshot.data?.docs ?? [];
+        final Map<String, int> unreadCounts = {};
+        for (var doc in unreadDocs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final uid = data['userId'] as String? ?? '';
+          if (uid.isNotEmpty) {
+            unreadCounts[uid] = (unreadCounts[uid] ?? 0) + 1;
+          }
+        }
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('users').snapshots(),
+          builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text('오류가 발생했습니다.', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
         }
@@ -84,7 +100,7 @@ class _AdminPersonalNoticeTabState extends State<AdminPersonalNoticeTab> {
           children: [
             _buildPersonalNoticeHeader(isDarkMode),
             Expanded(
-              child: _buildPersonalNoticeList(activeDocs, isDarkMode, '정회원 목록'),
+              child: _buildPersonalNoticeList(activeDocs, isDarkMode, '정회원 목록', unreadCounts),
             ),
             if (endedDocs.isNotEmpty) ...[
               Container(height: 1, color: isDarkMode ? Colors.white12 : Colors.grey.shade300),
@@ -96,11 +112,13 @@ class _AdminPersonalNoticeTabState extends State<AdminPersonalNoticeTab> {
               ),
               SizedBox(
                 height: 180,
-                child: _buildPersonalNoticeList(endedDocs, isDarkMode, '연수종료 회원 목록', hideHeader: true),
+                child: _buildPersonalNoticeList(endedDocs, isDarkMode, '연수종료 회원 목록', unreadCounts, hideHeader: true),
               ),
             ],
           ],
         );
+      },
+    );
       },
     );
   }
@@ -150,7 +168,7 @@ class _AdminPersonalNoticeTabState extends State<AdminPersonalNoticeTab> {
     );
   }
 
-  Widget _buildPersonalNoticeList(List<QueryDocumentSnapshot> docs, bool isDarkMode, String title, {bool hideHeader = false}) {
+  Widget _buildPersonalNoticeList(List<QueryDocumentSnapshot> docs, bool isDarkMode, String title, Map<String, int> unreadCounts, {bool hideHeader = false}) {
     if (docs.isEmpty) {
       return Center(
         child: Text('해당하는 회원이 없습니다.', style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54)),
@@ -189,7 +207,27 @@ class _AdminPersonalNoticeTabState extends State<AdminPersonalNoticeTab> {
                 children: [
                   Expanded(
                     flex: 3,
-                    child: Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                        if (unreadCounts.containsKey(doc.id) && unreadCounts[doc.id]! > 0) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '${unreadCounts[doc.id]}',
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                   Expanded(
                     flex: 5,
@@ -212,7 +250,25 @@ class _AdminPersonalNoticeTabState extends State<AdminPersonalNoticeTab> {
     );
   }
 
+  void _markNoticesAsRead(String userId) async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance.collection('personal_notices')
+          .where('userId', isEqualTo: userId)
+          .get();
+          
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        if (data['isFromUser'] == true && data['isRead'] != true) {
+          await doc.reference.update({'isRead': true});
+        }
+      }
+    } catch (e) {
+      debugPrint('Error marking notices as read: $e');
+    }
+  }
+
   void _showPersonalNoticeUserDialog(BuildContext context, String userId, String userName, bool isDarkMode) {
+    _markNoticesAsRead(userId);
     bool isDescending = true;
     showDialog(
       context: context,

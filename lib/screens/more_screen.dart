@@ -119,10 +119,7 @@ class _MoreScreenState extends State<MoreScreen> {
                   title: const Text('커뮤니티'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CommunityScreen()),
-                    );
+                    CommunityScreen.showPopup(context);
                   },
                 ),
                 const Divider(height: 1),
