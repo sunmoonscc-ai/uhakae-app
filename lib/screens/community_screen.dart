@@ -416,52 +416,49 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                     
                     setSt(() => isLoading = true);
                     
-                    List<String> newUrls = [];
-                    if (selectedImages.isNotEmpty) {
-                      for (var file in selectedImages) {
-                        final url = await FirebaseStorageService.uploadImage(file);
-                        if (url != null) {
-                          newUrls.add(url);
+                    try {
+                      List<String> newUrls = [];
+                      if (selectedImages.isNotEmpty) {
+                        for (var file in selectedImages) {
+                          final url = await FirebaseStorageService.uploadImage(file);
+                          if (url != null) {
+                            newUrls.add(url);
+                          }
                         }
                       }
-                    }
-                    
-                    final user = FirebaseAuth.instance.currentUser;
-                    
-                    // Firestore에서 사용자의 users 문서 ID를 가져옵니다.
-                    String? userDocId;
-                    try {
-                      final snap = await FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user!.email).limit(1).get();
-                      if (snap.docs.isNotEmpty) {
-                        userDocId = snap.docs.first.id;
+                      
+                      final user = FirebaseAuth.instance.currentUser;
+                      if (user == null) {
+                        if (context.mounted) UiUtils.showPopup(context, '로그인이 필요합니다.');
+                        setSt(() => isLoading = false);
+                        return;
+                      }
+                      
+                      // Firestore에서 사용자의 users 문서 ID를 가져옵니다.
+                      final userDocId = user.uid;
+
+                      final data = {
+                        'userId': userDocId,
+                        'title': titleCtrl.text.trim(),
+                        'content': contentCtrl.text.trim(),
+                        'image_urls': newUrls,
+                        'createdAt': FieldValue.serverTimestamp(),
+                        'isRead': false, 
+                        'isFromUser': true, 
+                        'senderName': user.displayName ?? '사용자',
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      };
+                      
+                      await FirebaseFirestore.instance.collection('personal_notices').add(data);
+                      
+                      if (context.mounted) {
+                        Navigator.pop(ctx);
+                        UiUtils.showPopup(context, '관리자에게 쪽지가 전송되었습니다.');
                       }
                     } catch (e) {
-                      debugPrint('Error fetching user doc: $e');
-                    }
-                    
-                    if (userDocId == null) {
-                      if (context.mounted) UiUtils.showPopup(context, '회원 정보를 확인할 수 없습니다.');
+                      debugPrint('Error sending message: $e');
+                      if (context.mounted) UiUtils.showPopup(context, '전송 중 오류가 발생했습니다.');
                       setSt(() => isLoading = false);
-                      return;
-                    }
-
-                    final data = {
-                      'userId': userDocId,
-                      'title': titleCtrl.text.trim(),
-                      'content': contentCtrl.text.trim(),
-                      'image_urls': newUrls,
-                      'createdAt': FieldValue.serverTimestamp(),
-                      'isRead': false, // 관리자가 읽어야 하므로 false로 변경! (중요)
-                      'isFromUser': true, // 사용자가 관리자에게 보낸 것임을 표시
-                      'senderName': user?.displayName ?? '사용자',
-                      'updatedAt': FieldValue.serverTimestamp(),
-                    };
-                    
-                    await FirebaseFirestore.instance.collection('personal_notices').add(data);
-                    
-                    if (context.mounted) {
-                      Navigator.pop(ctx);
-                      UiUtils.showPopup(context, '관리자에게 쪽지가 전송되었습니다.');
                     }
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
