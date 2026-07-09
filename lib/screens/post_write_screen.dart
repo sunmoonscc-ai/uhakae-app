@@ -383,7 +383,8 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: DropdownButton<String>(
+                            child: DropdownButtonFormField<String>(
+                              decoration: const InputDecoration(labelText: '지역', border: OutlineInputBorder(), isDense: true),
                               isExpanded: true,
                               value: _availableRegions.contains(_selectedFilterRegion) ? _selectedFilterRegion : '전체',
                               items: _availableRegions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
@@ -400,7 +401,8 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: DropdownButton<String>(
+                            child: DropdownButtonFormField<String>(
+                              decoration: const InputDecoration(labelText: '어학원', border: OutlineInputBorder(), isDense: true),
                               isExpanded: true,
                               value: _availableSchools.contains(_selectedFilterSchool) ? _selectedFilterSchool : '전체',
                               items: _availableSchools.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
@@ -417,21 +419,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      TextField(
-                        onChanged: (val) {
-                          setState(() {
-                            _nameFilter = val;
-                            _selectedUserId = _filteredUsers.isNotEmpty ? _filteredUsers.first['id'] : null;
-                          });
-                        },
-                        decoration: InputDecoration(
-                          labelText: '이름으로 검색',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87),
-                        ),
-                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                      ),
+
                       const SizedBox(height: 12),
                     ],
                     Row(

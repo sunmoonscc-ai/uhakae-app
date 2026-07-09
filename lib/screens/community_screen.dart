@@ -467,7 +467,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                   child: isLoading 
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text('저장', style: TextStyle(color: Colors.white)),
+                      : const Text('전송', style: TextStyle(color: Colors.white)),
                 ),
               ],
             );
@@ -604,119 +604,23 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
               timeAgo = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
             }
 
-            if (category == 'individual_notice') {
-              final bool isFromMe = data['isFromUser'] == true;
-              final bool isRead = data['isRead'] == true;
-              return InkWell(
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => Dialog(
-                      insetPadding: const EdgeInsets.all(16),
-                      clipBehavior: Clip.antiAliasWithSaveLayer,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: MediaQuery.of(context).size.height * 0.8,
-                        child: PostDetailScreen(postData: data),
-                      ),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                  child: Row(
-                    mainAxisAlignment: !isFromMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (isFromMe) ...[
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                          child: Icon(Icons.person, size: 20, color: isDarkMode ? Colors.grey : Colors.black54),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      if (!isFromMe)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 4.0, bottom: 4.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              if (!isRead) const Text('1', style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
-                              Text(timeAgo, style: TextStyle(fontSize: 10, color: Colors.grey)),
-                            ],
-                          ),
-                        ),
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isFromMe 
-                                ? (isDarkMode ? Colors.grey[800] : Colors.white)
-                                : (isDarkMode ? Colors.blue[900] : Colors.blue[100]),
-                            border: isFromMe ? Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300) : null,
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(16),
-                              topRight: const Radius.circular(16),
-                              bottomLeft: isFromMe ? const Radius.circular(4) : const Radius.circular(16),
-                              bottomRight: isFromMe ? const Radius.circular(16) : const Radius.circular(4),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black, fontSize: 14)),
-                              const SizedBox(height: 4),
-                              Text(
-                                content, 
-                                maxLines: 2, 
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87, fontSize: 13),
-                              ),
-                              if (imageUrls.isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.image, size: 14, color: isDarkMode ? Colors.white54 : Colors.black54),
-                                    const SizedBox(width: 4),
-                                    Text('사진 첨부됨', style: TextStyle(fontSize: 11, color: isDarkMode ? Colors.white54 : Colors.black54)),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (isFromMe)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4.0, bottom: 4.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (!isRead) const Text('1', style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
-                              Text(timeAgo, style: TextStyle(fontSize: 10, color: Colors.grey)),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
             bool isNoticeUnread = false;
-            if (category == 'notice' && !isAdmin) {
-              isNoticeUnread = !PreferencesService.readNotices.contains(data['id']);
+            if (!isAdmin) {
+              if (category == 'notice') {
+                isNoticeUnread = !PreferencesService.readNotices.contains(data['id']);
+              } else if (category == 'individual_notice') {
+                final bool isRead = data['isRead'] == true;
+                final bool isFromUser = data['isFromUser'] == true;
+                if (!isFromUser && !isRead) {
+                  isNoticeUnread = true;
+                }
+              }
             }
 
             FontWeight fontWeight = FontWeight.bold;
             Color titleColor = isDarkMode ? Colors.white : Colors.black;
 
-            if (category == 'notice' && !isAdmin) {
+            if (!isAdmin && (category == 'notice' || category == 'individual_notice')) {
               if (isNoticeUnread) {
                 fontWeight = FontWeight.bold;
                 titleColor = isDarkMode ? Colors.white : Colors.black;
@@ -778,7 +682,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                   children: [
                     if (category == 'notice' || category == 'individual_notice') ...[
                       Chip(
-                        label: Text('공지', style: TextStyle(color: isDarkMode ? Colors.black : Colors.white, fontSize: 10)),
+                        label: Text(category == 'notice' ? '공지' : '쪽지', style: TextStyle(color: isDarkMode ? Colors.black : Colors.white, fontSize: 10)),
                         backgroundColor: isDarkMode ? Colors.white : Colors.black,
                         padding: EdgeInsets.zero,
                         visualDensity: VisualDensity.compact,
