@@ -52,13 +52,20 @@ class AdminNotificationBadge extends StatelessWidget {
                     return StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance.collection('orders').where('hasUnreadReturnRequest', isEqualTo: true).snapshots(),
                       builder: (context, returnSnapshot) {
-                        int pendingCount = 0;
-                        if (orderSnapshot.hasData) pendingCount += orderSnapshot.data!.docs.length;
-                        if (userSnapshot.hasData) pendingCount += userSnapshot.data!.docs.length;
-                        if (infoSnapshot.hasData) pendingCount += infoSnapshot.data!.docs.length;
-                        if (returnSnapshot.hasData) pendingCount += returnSnapshot.data!.docs.length;
+                        return StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance.collection('personal_notices')
+                              .where('isFromUser', isEqualTo: true)
+                              .where('isRead', isEqualTo: false)
+                              .snapshots(),
+                          builder: (context, noticeSnapshot) {
+                            int pendingCount = 0;
+                            if (orderSnapshot.hasData) pendingCount += orderSnapshot.data!.docs.length;
+                            if (userSnapshot.hasData) pendingCount += userSnapshot.data!.docs.length;
+                            if (infoSnapshot.hasData) pendingCount += infoSnapshot.data!.docs.length;
+                            if (returnSnapshot.hasData) pendingCount += returnSnapshot.data!.docs.length;
+                            if (noticeSnapshot.hasData) pendingCount += noticeSnapshot.data!.docs.length;
 
-                        if (pendingCount == 0) return const SizedBox.shrink();
+                            if (pendingCount == 0) return const SizedBox.shrink();
 
                         return InkWell(
                           onTap: () {
@@ -85,6 +92,8 @@ class AdminNotificationBadge extends StatelessWidget {
                 );
               },
             );
+          },
+        );
           },
         );
       },

@@ -31,12 +31,21 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       if (postId != null) {
         await PreferencesService.addReadNotice(postId);
       }
-    } else if (category == 'individual_notice' && !isAdmin) {
+    } else if (category == 'individual_notice') {
       final bool isRead = widget.postData['isRead'] ?? false;
       final bool isFromUser = widget.postData['isFromUser'] ?? true;
-      // 내가 받은 안 읽은 쪽지라면 DB 업데이트
-      if (!isFromUser && !isRead) {
-        final docId = widget.postData['id']; // community_screen에서 id를 추가해줬다면
+      
+      // 사용자: 관리자가 보낸 쪽지(!isFromUser)를 읽음
+      // 관리자: 사용자가 보낸 쪽지(isFromUser)를 읽음
+      bool shouldUpdate = false;
+      if (!isAdmin && !isFromUser && !isRead) {
+        shouldUpdate = true;
+      } else if (isAdmin && isFromUser && !isRead) {
+        shouldUpdate = true;
+      }
+
+      if (shouldUpdate) {
+        final docId = widget.postData['id'];
         if (docId != null) {
           try {
             await FirebaseFirestore.instance.collection('personal_notices').doc(docId).update({'isRead': true});
