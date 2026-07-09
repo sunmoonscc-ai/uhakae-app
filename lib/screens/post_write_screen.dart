@@ -34,6 +34,21 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
 
   List<Map<String, dynamic>> _users = [];
   String? _selectedUserId;
+
+  String _selectedFilterRegion = '전체';
+  String _selectedFilterSchool = '전체';
+  String _nameFilter = '';
+  Set<String> _availableRegions = {'전체'};
+  Set<String> _availableSchools = {'전체'};
+
+  List<Map<String, dynamic>> get _filteredUsers {
+    return _users.where((u) {
+      if (_selectedFilterRegion != '전체' && u['region'] != _selectedFilterRegion) return false;
+      if (_selectedFilterSchool != '전체' && u['school'] != _selectedFilterSchool) return false;
+      if (_nameFilter.isNotEmpty && !u['nickname'].toString().toLowerCase().contains(_nameFilter.toLowerCase())) return false;
+      return true;
+    }).toList();
+  }
   
   final List<String> _adminEmails = [
     'cebufriends79@gmail.com',
@@ -72,15 +87,38 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
     final snap = await FirebaseFirestore.instance.collection('users').get();
     if (mounted) {
       setState(() {
-        _users = snap.docs.map((doc) => {
-          'id': doc.id,
-          'email': doc.data()['email'] ?? '',
-          'nickname': doc.data()['nickname'] ?? doc.data()['name'] ?? '알 수 없음',
+        _availableRegions = {'전체'};
+        _users = snap.docs.map((doc) {
+          final data = doc.data();
+          final region = data['region'] ?? '';
+          if (region.isNotEmpty) _availableRegions.add(region);
+
+          return {
+            'id': doc.id,
+            'email': data['email'] ?? '',
+            'nickname': data['nickname'] ?? data['name'] ?? '알 수 없음',
+            'region': region,
+            'school': data['school'] ?? '',
+          };
         }).toList();
-        if (_users.isNotEmpty && _selectedUserId == null) {
-          _selectedUserId = _users.first['id'];
+        _updateAvailableSchools();
+
+        if (_filteredUsers.isNotEmpty && _selectedUserId == null) {
+          _selectedUserId = _filteredUsers.first['id'];
         }
       });
+    }
+  }
+
+  void _updateAvailableSchools() {
+    _availableSchools = {'전체'};
+    for (var u in _users) {
+      if (_selectedFilterRegion != '전체' && u['region'] != _selectedFilterRegion) continue;
+      final school = u['school'] ?? '';
+      if (school.isNotEmpty) _availableSchools.add(school);
+    }
+    if (!_availableSchools.contains(_selectedFilterSchool)) {
+      _selectedFilterSchool = '전체';
     }
   }
 
@@ -324,33 +362,92 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
             if (_selectedCategory == 'individual_notice')
               Padding(
                 padding: const EdgeInsets.only(top: 16.0),
-                child: Row(
+                child: Column(
                   children: [
-                    Text('받는 사람:', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
-                    const SizedBox(width: 16),
-                    if (!isAdmin)
-                      Text('관리자', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16))
-                    else
-                      Expanded(
-                        child: DropdownButton<String>(
-                          isExpanded: true,
-                          value: _selectedUserId,
-                          hint: const Text('사용자를 선택하세요'),
-                          dropdownColor: isDarkMode ? Colors.grey[900] : Colors.white,
-                          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                          items: _users.map((user) {
-                            return DropdownMenuItem<String>(
-                              value: user['id'],
-                              child: Text('${user['nickname']} (${user['email']})', overflow: TextOverflow.ellipsis),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedUserId = val);
-                            }
-                          },
-                        ),
+                    if (isAdmin) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _availableRegions.contains(_selectedFilterRegion) ? _selectedFilterRegion : '전체',
+                              items: _availableRegions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() {
+                                    _selectedFilterRegion = val;
+                                    _updateAvailableSchools();
+                                    _selectedUserId = _filteredUsers.isNotEmpty ? _filteredUsers.first['id'] : null;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _availableSchools.contains(_selectedFilterSchool) ? _selectedFilterSchool : '전체',
+                              items: _availableSchools.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() {
+                                    _selectedFilterSchool = val;
+                                    _selectedUserId = _filteredUsers.isNotEmpty ? _filteredUsers.first['id'] : null;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        onChanged: (val) {
+                          setState(() {
+                            _nameFilter = val;
+                            _selectedUserId = _filteredUsers.isNotEmpty ? _filteredUsers.first['id'] : null;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          labelText: '이름으로 검색',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87),
+                        ),
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    Row(
+                      children: [
+                        Text('받는 사람:', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
+                        const SizedBox(width: 16),
+                        if (!isAdmin)
+                          Text('관리자', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16))
+                        else
+                          Expanded(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _filteredUsers.any((u) => u['id'] == _selectedUserId) ? _selectedUserId : null,
+                              hint: const Text('사용자를 선택하세요'),
+                              dropdownColor: isDarkMode ? Colors.grey[900] : Colors.white,
+                              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                              items: _filteredUsers.map((user) {
+                                return DropdownMenuItem<String>(
+                                  value: user['id'],
+                                  child: Text('${user['nickname']} (${user['email']})', overflow: TextOverflow.ellipsis),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _selectedUserId = val);
+                                }
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),

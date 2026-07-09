@@ -25,6 +25,20 @@ class PreferencesService {
   // 향후 다른 설정들의 키를 여기에 추가할 수 있습니다.
   // static const String _isNotificationsEnabledKey = 'isNotificationsEnabled';
 
+  static const String _readNoticesKey = 'readNotices';
+
+  static List<String> get readNotices {
+    return _prefs.getStringList(_readNoticesKey) ?? [];
+  }
+
+  static Future<void> addReadNotice(String noticeId) async {
+    final list = readNotices;
+    if (!list.contains(noticeId)) {
+      list.add(noticeId);
+      await _prefs.setStringList(_readNoticesKey, list);
+    }
+  }
+
   // --- 다크 모드 설정 ---
   static bool get isDarkMode {
     // 저장된 값이 없으면 기본적으로 false(라이트 모드)를 반환합니다.

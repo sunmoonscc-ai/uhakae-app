@@ -4,19 +4,57 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'post_write_screen.dart';
+import 'package:study_abroad_app/services/preferences_service.dart';
 
-class PostDetailScreen extends StatelessWidget {
+class PostDetailScreen extends StatefulWidget {
   final Map<String, dynamic> postData;
 
   const PostDetailScreen({super.key, required this.postData});
 
   @override
+  State<PostDetailScreen> createState() => _PostDetailScreenState();
+}
+
+class _PostDetailScreenState extends State<PostDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _markAsRead();
+  }
+
+  Future<void> _markAsRead() async {
+    final category = widget.postData['category'];
+    final isAdmin = PreferencesService.isAdmin;
+
+    if (category == 'notice' && !isAdmin) {
+      final postId = widget.postData['id'];
+      if (postId != null) {
+        await PreferencesService.addReadNotice(postId);
+      }
+    } else if (category == 'individual_notice' && !isAdmin) {
+      final bool isRead = widget.postData['isRead'] ?? false;
+      final bool isFromUser = widget.postData['isFromUser'] ?? true;
+      // 내가 받은 안 읽은 쪽지라면 DB 업데이트
+      if (!isFromUser && !isRead) {
+        final docId = widget.postData['id']; // community_screen에서 id를 추가해줬다면
+        if (docId != null) {
+          try {
+            await FirebaseFirestore.instance.collection('personal_notices').doc(docId).update({'isRead': true});
+          } catch (e) {
+            debugPrint('Failed to mark message as read: $e');
+          }
+        }
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final category = postData['category'] == 'notice' 
+    final category = widget.postData['category'] == 'notice' 
         ? '공지사항' 
-        : (postData['category'] == 'individual_notice' ? '쪽지' : '자유 게시판');
-    final postId = postData['id'] as String?;
+        : (widget.postData['category'] == 'individual_notice' ? '쪽지' : '자유 게시판');
+    final postId = widget.postData['id'] as String?;
 
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
@@ -50,7 +88,7 @@ class PostDetailScreen extends StatelessWidget {
         actions: [
           if (postId != null)
             StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('posts').doc(postId).snapshots(),
+              stream: FirebaseFirestore.instance.collection(category == '쪽지' ? 'personal_notices' : 'posts').doc(postId).snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox();
                 final currentData = snapshot.data!.data() as Map<String, dynamic>;
@@ -102,7 +140,7 @@ class PostDetailScreen extends StatelessWidget {
 
                       if (confirm == true) {
                         try {
-                          await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
+                          await FirebaseFirestore.instance.collection(category == '쪽지' ? 'personal_notices' : 'posts').doc(postId).delete();
                           if (context.mounted) {
                             UiUtils.showPopup(context, '게시글이 삭제되었습니다.');
                             Navigator.pop(context);
@@ -129,9 +167,9 @@ class PostDetailScreen extends StatelessWidget {
         ],
       ),
       body: postId == null 
-        ? _buildContent(context, postData, isDarkMode) 
+        ? _buildContent(context, widget.postData, isDarkMode) 
         : StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance.collection('posts').doc(postId).snapshots(),
+            stream: FirebaseFirestore.instance.collection(category == '쪽지' ? 'personal_notices' : 'posts').doc(postId).snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());

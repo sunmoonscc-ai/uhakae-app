@@ -424,11 +424,7 @@ class _NoticeSectionState extends State<_NoticeSection> {
   Future<void> _initMessageStream() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final snap = await FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).get();
-      if (snap.docs.isNotEmpty) {
-        final docId = snap.docs.first.id;
-        _messageStream = FirebaseFirestore.instance.collection('personal_notices').where('userId', isEqualTo: docId).snapshots();
-      }
+      _messageStream = FirebaseFirestore.instance.collection('personal_notices').where('userId', isEqualTo: user.uid).snapshots();
     }
     if (mounted) {
       setState(() {
@@ -508,10 +504,37 @@ class _NoticeSectionState extends State<_NoticeSection> {
                   } else {
                     titleWithDate = '방금 전 $title';
                   }
+                  bool isUnread = false;
+                  final isAdmin = PreferencesService.isAdmin;
+                  if (!isAdmin) {
+                    if (isNotice) {
+                      isUnread = !PreferencesService.readNotices.contains(n['id']);
+                    } else {
+                      final bool messageIsRead = n['isRead'] ?? false;
+                      final bool isFromUser = n['isFromUser'] ?? true;
+                      if (!isFromUser && !messageIsRead) {
+                        isUnread = true;
+                      }
+                    }
+                  }
+
+                  Color textColor = isDarkMode ? Colors.white : Colors.black87;
+                  FontWeight fontWeight = FontWeight.normal;
+
+                  if (!isAdmin) {
+                    if (isUnread) {
+                      fontWeight = FontWeight.bold;
+                      textColor = isDarkMode ? Colors.white : Colors.black;
+                    } else {
+                      textColor = Colors.grey;
+                    }
+                  }
                   
                   return InkWell(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => PostDetailScreen(postData: n)));
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => PostDetailScreen(postData: n))).then((_) {
+                        setState(() {});
+                      });
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), 
@@ -531,7 +554,8 @@ class _NoticeSectionState extends State<_NoticeSection> {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isDarkMode ? Colors.white : Colors.black87,
+                                color: textColor,
+                                fontWeight: fontWeight,
                               ),
                             ),
                           ),

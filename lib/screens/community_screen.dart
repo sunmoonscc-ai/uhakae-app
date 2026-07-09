@@ -7,6 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:study_abroad_app/main.dart';
+import 'package:study_abroad_app/utils/ui_utils.dart';
+import 'package:study_abroad_app/services/preferences_service.dart';
 import 'post_write_screen.dart';
 import 'post_detail_screen.dart';
 import '../utils/ui_utils.dart';
@@ -82,11 +84,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
   Future<void> _initIndividualNoticeStream() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final snap = await FirebaseFirestore.instance.collection('users').where('email', isEqualTo: user.email).limit(1).get();
-      if (snap.docs.isNotEmpty) {
-        final docId = snap.docs.first.id;
-        _individualNoticeStream = FirebaseFirestore.instance.collection('personal_notices').where('userId', isEqualTo: docId).snapshots();
-      }
+      _individualNoticeStream = FirebaseFirestore.instance.collection('personal_notices').where('userId', isEqualTo: user.uid).snapshots();
     }
     if (mounted) {
       setState(() {
@@ -707,6 +705,24 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
               );
             }
 
+            bool isNoticeUnread = false;
+            if (category == 'notice' && !isAdmin) {
+              isNoticeUnread = !PreferencesService.readNotices.contains(data['id']);
+            }
+
+            FontWeight fontWeight = FontWeight.bold;
+            Color titleColor = isDarkMode ? Colors.white : Colors.black;
+
+            if (category == 'notice' && !isAdmin) {
+              if (isNoticeUnread) {
+                fontWeight = FontWeight.bold;
+                titleColor = isDarkMode ? Colors.white : Colors.black;
+              } else {
+                fontWeight = FontWeight.normal;
+                titleColor = Colors.grey;
+              }
+            }
+
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               color: isDarkMode ? Colors.grey[900] : Colors.white,
@@ -729,7 +745,9 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                         child: PostDetailScreen(postData: data),
                       ),
                     ),
-                  );
+                  ).then((_) {
+                    setState(() {});
+                  });
                 },
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                 title: Row(
@@ -739,7 +757,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                         title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 14, fontWeight: FontWeight.bold)
+                        style: TextStyle(color: titleColor, fontSize: 14, fontWeight: fontWeight)
                       ),
                     ),
                     if (imageUrls.isNotEmpty) ...[
