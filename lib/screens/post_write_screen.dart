@@ -193,31 +193,46 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
           return;
         }
 
-        final personalNoticeData = {
-          'title': _titleController.text,
-          'content': _contentController.text,
-          'image_urls': finalImageUrls,
-          'createdAt': FieldValue.serverTimestamp(),
-          'userId': isAdmin ? _selectedUserId : user.uid,
-          'senderName': user.displayName ?? '사용자',
-          'isFromUser': !isAdmin,
-          'isRead': false,
-        };
-
-        if (widget.editPostId != null) {
-          personalNoticeData['updatedAt'] = FieldValue.serverTimestamp();
-          await FirebaseFirestore.instance.collection('personal_notices').doc(widget.editPostId).update(personalNoticeData);
-          if (mounted) {
-            UiUtils.showPopup(context, '쪽지가 수정되었습니다.');
-            Navigator.pop(context);
+        if (isAdmin && _selectedUserId == 'all') {
+          WriteBatch batch = FirebaseFirestore.instance.batch();
+          for (var u in _filteredUsers) {
+            final docRef = FirebaseFirestore.instance.collection('personal_notices').doc();
+            batch.set(docRef, {
+              'title': _titleController.text,
+              'content': _contentController.text,
+              'image_urls': finalImageUrls,
+              'createdAt': FieldValue.serverTimestamp(),
+              'isRead': false,
+              'userId': u['id'],
+              'isFromUser': false,
+              'senderName': '관리자',
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
           }
-          return;
+          await batch.commit();
+        } else {
+          final personalNoticeData = {
+            'title': _titleController.text,
+            'content': _contentController.text,
+            'image_urls': finalImageUrls,
+            'createdAt': FieldValue.serverTimestamp(),
+            'isRead': false,
+            'userId': isAdmin ? _selectedUserId : user.uid,
+            'isFromUser': !isAdmin,
+            'senderName': isAdmin ? '관리자' : (user.displayName ?? '사용자'),
+            'updatedAt': FieldValue.serverTimestamp(),
+          };
+
+          if (widget.editPostId != null) {
+            await FirebaseFirestore.instance.collection('personal_notices').doc(widget.editPostId).update(personalNoticeData);
+          } else {
+            await FirebaseFirestore.instance.collection('personal_notices').add(personalNoticeData);
+          }
         }
 
-        await FirebaseFirestore.instance.collection('personal_notices').add(personalNoticeData);
-        if (mounted) {
-          UiUtils.showPopup(context, '쪽지가 전송되었습니다.');
+        if (context.mounted) {
           Navigator.pop(context);
+          UiUtils.showPopup(context, '쪽지가 저장되었습니다.');
         }
         return;
       }
@@ -429,16 +444,22 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                           Expanded(
                             child: DropdownButton<String>(
                               isExpanded: true,
-                              value: _filteredUsers.any((u) => u['id'] == _selectedUserId) ? _selectedUserId : null,
+                              value: (_selectedUserId == 'all' || _filteredUsers.any((u) => u['id'] == _selectedUserId)) ? _selectedUserId : null,
                               hint: const Text('사용자를 선택하세요'),
                               dropdownColor: isDarkMode ? Colors.grey[900] : Colors.white,
                               style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                              items: _filteredUsers.map((user) {
-                                return DropdownMenuItem<String>(
-                                  value: user['id'],
-                                  child: Text('${user['nickname']} (${user['email']})', overflow: TextOverflow.ellipsis),
-                                );
-                              }).toList(),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                  value: 'all',
+                                  child: Text('전체 (필터링된 모든 대상)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                                ),
+                                ..._filteredUsers.map((user) {
+                                  return DropdownMenuItem<String>(
+                                    value: user['id'],
+                                    child: Text('${user['nickname']} (${user['email']})', overflow: TextOverflow.ellipsis),
+                                  );
+                                }),
+                              ],
                               onChanged: (val) {
                                 if (val != null) {
                                   setState(() => _selectedUserId = val);

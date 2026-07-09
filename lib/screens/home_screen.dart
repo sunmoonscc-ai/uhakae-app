@@ -424,7 +424,11 @@ class _NoticeSectionState extends State<_NoticeSection> {
   Future<void> _initMessageStream() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      _messageStream = FirebaseFirestore.instance.collection('personal_notices').where('userId', isEqualTo: user.uid).snapshots();
+      if (PreferencesService.isAdmin) {
+        _messageStream = FirebaseFirestore.instance.collection('personal_notices').snapshots();
+      } else {
+        _messageStream = FirebaseFirestore.instance.collection('personal_notices').where('userId', isEqualTo: user.uid).snapshots();
+      }
     }
     if (mounted) {
       setState(() {

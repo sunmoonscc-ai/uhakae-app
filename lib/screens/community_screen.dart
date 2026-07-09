@@ -84,7 +84,11 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
   Future<void> _initIndividualNoticeStream() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      _individualNoticeStream = FirebaseFirestore.instance.collection('personal_notices').where('userId', isEqualTo: user.uid).snapshots();
+      if (PreferencesService.isAdmin) {
+        _individualNoticeStream = FirebaseFirestore.instance.collection('personal_notices').snapshots();
+      } else {
+        _individualNoticeStream = FirebaseFirestore.instance.collection('personal_notices').where('userId', isEqualTo: user.uid).snapshots();
+      }
     }
     if (mounted) {
       setState(() {
