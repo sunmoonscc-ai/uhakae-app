@@ -33,9 +33,18 @@ class UserNotificationBadge extends StatelessWidget {
 
         return InkWell(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const CommunityScreen(initialTabIndex: 1)),
+            showDialog(
+              context: context,
+              builder: (context) => Dialog(
+                insetPadding: const EdgeInsets.all(16),
+                clipBehavior: Clip.antiAliasWithSaveLayer,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: MediaQuery.of(context).size.height * 0.8,
+                  child: const CommunityScreen(initialTabIndex: 1, isDialog: true),
+                ),
+              ),
             );
           },
           child: Padding(

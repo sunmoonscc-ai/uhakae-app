@@ -19,7 +19,8 @@ class CommunityScreen extends StatefulWidget {
   final bool showAppBar;
   final String region;
   final int initialTabIndex;
-  const CommunityScreen({super.key, this.showAppBar = true, this.region = '전체', this.initialTabIndex = 0});
+  final bool isDialog;
+  const CommunityScreen({super.key, this.showAppBar = true, this.region = '전체', this.initialTabIndex = 0, this.isDialog = false});
 
   @override
   State<CommunityScreen> createState() => _CommunityScreenState();
@@ -135,6 +136,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF8F9FA),
       appBar: widget.showAppBar ? AppBar(
+        automaticallyImplyLeading: !widget.isDialog,
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
         elevation: 0,
         title: Row(
@@ -157,7 +159,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
             ),
             const SizedBox(width: 8),
             Text(
-              '커뮤니티',
+              widget.isDialog ? '쪽지' : '커뮤니티',
               style: TextStyle(
                 color: isDarkMode ? Colors.white : Colors.black,
                 fontWeight: FontWeight.bold,
@@ -166,7 +168,12 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
             ),
           ],
         ),
-        actions: [
+        actions: widget.isDialog ? [
+          IconButton(
+            icon: Icon(Icons.close, color: isDarkMode ? Colors.white : Colors.black),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ] : [
           if (PreferencesService.isAdmin)
             const AdminNotificationBadge()
           else
