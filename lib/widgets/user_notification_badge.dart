@@ -35,7 +35,7 @@ class UserNotificationBadge extends StatelessWidget {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const CommunityScreen()),
+              MaterialPageRoute(builder: (context) => const CommunityScreen(initialTabIndex: 1)),
             );
           },
           child: Padding(

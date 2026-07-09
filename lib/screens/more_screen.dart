@@ -1,6 +1,8 @@
 import 'package:study_abroad_app/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
-import '../widgets/admin_notification_badge.dart';
+import 'package:study_abroad_app/services/preferences_service.dart';
+import 'package:study_abroad_app/widgets/admin_notification_badge.dart';
+import 'package:study_abroad_app/widgets/user_notification_badge.dart';
 import 'community_screen.dart';
 import 'admin_screen.dart';
 
@@ -77,8 +79,11 @@ class _MoreScreenState extends State<MoreScreen> {
         title: const Text('더보기', style: TextStyle(color: Color(0xFF00327D), fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 0,
-        actions: const [
-          AdminNotificationBadge(),
+        actions: [
+          if (PreferencesService.isAdmin)
+            const AdminNotificationBadge()
+          else
+            const UserNotificationBadge(),
         ],
       ),
       body: ListView(

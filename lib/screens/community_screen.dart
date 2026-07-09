@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:study_abroad_app/widgets/admin_personal_notice_tab.dart';
 import 'package:study_abroad_app/widgets/admin_notification_badge.dart';
+import 'package:study_abroad_app/widgets/user_notification_badge.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
@@ -17,7 +18,8 @@ import '../services/firebase_storage_service.dart';
 class CommunityScreen extends StatefulWidget {
   final bool showAppBar;
   final String region;
-  const CommunityScreen({super.key, this.showAppBar = true, this.region = '전체'});
+  final int initialTabIndex;
+  const CommunityScreen({super.key, this.showAppBar = true, this.region = '전체', this.initialTabIndex = 0});
 
   @override
   State<CommunityScreen> createState() => _CommunityScreenState();
@@ -45,7 +47,8 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
   void initState() {
     super.initState();
     region = widget.region ?? '전체';
-    _tabController = TabController(length: 3, vsync: this);
+    _lastSelectedIndex = widget.initialTabIndex;
+    _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTabIndex);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         _lastSelectedIndex = _tabController.index;
@@ -163,8 +166,11 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
             ),
           ],
         ),
-        actions: const [
-          AdminNotificationBadge(),
+        actions: [
+          if (PreferencesService.isAdmin)
+            const AdminNotificationBadge()
+          else
+            const UserNotificationBadge(),
         ],
         bottom: TabBar(
           controller: _tabController,
