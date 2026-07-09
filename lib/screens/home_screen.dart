@@ -273,50 +273,9 @@ class _FavoriteListSectionState extends State<_FavoriteListSection> {
                           if (hPad < minPadding) hPad = minPadding;
                           if (hPad > 20.0) hPad = 20.0; // 최대 간격 제한
 
-                          if (widget.type == 'business') {
-                            List<Widget> row1 = [];
-                            List<Widget> row2 = [];
-                            
-                            if (favorites.length <= itemsPerRow) {
-                              row1 = favorites.map((cat) => _buildFavoriteItem(cat, context, hPad)).toList();
-                            } else {
-                              int half = (favorites.length / 2).ceil();
-                              if (half < itemsPerRow) {
-                                half = itemsPerRow;
-                              }
-                              for (int i = 0; i < favorites.length; i++) {
-                                if (i < half) {
-                                  row1.add(_buildFavoriteItem(favorites[i], context, hPad));
-                                } else {
-                                  row2.add(_buildFavoriteItem(favorites[i], context, hPad));
-                                }
-                              }
-                            }
-
-                            return SizedBox(
-                              height: 228,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: row1,
-                                  ),
-                                  if (row2.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: row2,
-                                    ),
-                                  ]
-                                ],
-                              ),
-                            );
-                          } else {
-                            return Row(
-                              children: favorites.map((cat) => _buildFavoriteItem(cat, context, hPad)).toList(),
-                            );
-                          }
+                          return Row(
+                            children: favorites.map((cat) => _buildFavoriteItem(cat, context, hPad)).toList(),
+                          );
                         }
                       ),
                     ),
